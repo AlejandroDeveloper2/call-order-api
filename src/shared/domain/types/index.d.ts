@@ -1,4 +1,4 @@
-export interface ServerErrorResponse {
+interface ServerErrorResponse {
   name: string;
   httpCode: number;
   isOperational: boolean;
@@ -6,8 +6,15 @@ export interface ServerErrorResponse {
   path: string;
   timestamp: string;
 }
-export interface ApiResponse<T> {
+
+interface ApiResponse<T> {
   data: T;
   message: string;
   httpCode: number;
 }
+
+interface JwtPayload {
+  accountId: string;
+}
+
+export { ServerErrorResponse, ApiResponse, JwtPayload };
