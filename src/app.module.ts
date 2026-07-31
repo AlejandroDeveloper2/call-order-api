@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { SharedModule } from './shared/shared.module';
 import { AuthModule } from './auth/auth.module';
@@ -12,6 +13,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { OrdersModule } from './orders/orders.module';
 import { ClientsModule } from './clients/clients.module';
 import { BranchesModule } from './branches/branches.module';
+
+import { ApiResponseInterceptor } from './shared/infrastructure/interceptors/api-response.interceptor';
 
 @Module({
   imports: [
@@ -47,5 +50,6 @@ import { BranchesModule } from './branches/branches.module';
     ClientsModule,
     BranchesModule,
   ],
+  providers: [{ provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor }],
 })
 export class AppModule {}

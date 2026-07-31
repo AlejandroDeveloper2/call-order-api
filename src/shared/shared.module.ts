@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
-import { SharedService } from './shared.service';
-import { SharedController } from './shared.controller';
+import { ConfigModule } from '@nestjs/config';
+
+import { NodeMailerAdapter } from './infrastructure/adapters/nodemailer.adapter';
 
 @Module({
-  controllers: [SharedController],
-  providers: [SharedService],
+  imports: [ConfigModule],
+  providers: [NodeMailerAdapter],
+  exports: [NodeMailerAdapter],
 })
 export class SharedModule {}
