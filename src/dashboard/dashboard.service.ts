@@ -5,6 +5,7 @@ import { UpdateDashboardDto } from './dto/update-dashboard.dto';
 @Injectable()
 export class DashboardService {
   create(createDashboardDto: CreateDashboardDto) {
+    console.log('createDashboardDto', createDashboardDto);
     return 'This action adds a new dashboard';
   }
 
@@ -17,6 +18,7 @@ export class DashboardService {
   }
 
   update(id: number, updateDashboardDto: UpdateDashboardDto) {
+    console.log('updateDashboardDto', updateDashboardDto);
     return `This action updates a #${id} dashboard`;
   }
 

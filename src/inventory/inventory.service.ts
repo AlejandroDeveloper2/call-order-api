@@ -5,6 +5,7 @@ import { UpdateInventoryDto } from './dto/update-inventory.dto';
 @Injectable()
 export class InventoryService {
   create(createInventoryDto: CreateInventoryDto) {
+    console.log('createInventoryDto', createInventoryDto);
     return 'This action adds a new inventory';
   }
 
@@ -17,6 +18,7 @@ export class InventoryService {
   }
 
   update(id: number, updateInventoryDto: UpdateInventoryDto) {
+    console.log('updateInventoryDto', updateInventoryDto);
     return `This action updates a #${id} inventory`;
   }
 
