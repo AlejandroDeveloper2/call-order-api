@@ -2,7 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
 import { AppModule } from './../src/app.module';
+
+dotenv.config({ path: path.resolve(__dirname, '../.env.test') });
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -19,8 +25,7 @@ describe('AppController (e2e)', () => {
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
-      .expect(200)
-      .expect('Hello World!');
+      .expect({ data: 'Hello World!', message: 'Success', httpCode: 200 });
   });
 
   afterEach(async () => {

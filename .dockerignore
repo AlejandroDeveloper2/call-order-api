@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.env
+.env.*
+!.env.example
+coverage
+.eslintrc.js
+.prettierrc
+docker-compose*.yml
+Dockerfile
+.github
+*.log
+.vscode
+.idea
