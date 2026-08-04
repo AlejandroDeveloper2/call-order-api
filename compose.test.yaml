@@ -1,32 +1,22 @@
 services:
-  postgres:
+  db:
     image: postgres:16-alpine
-
     environment:
-      POSTGRES_DB: call-order-db-test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-
+      POSTGRES_PASSWORD: postgres_test
+    ports:
+      - '5432:5432' # Expuesto para que el runner de GH Actions pueda conectarse si usamos red host, pero mejor usar red interna.
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d call-order-db-test']
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
       timeout: 5s
       retries: 10
 
-  api:
+  app:
     build:
       context: .
-      dockerfile: docker/Dockerfile
-
+      target: test # Incluye código, dependencias y NestJS
     environment:
       NODE_ENV: test
-
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: call-order-db-test
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-
-    depends_on:
-      postgres:
-        condition: service_healthy
+      DB_HOST: db
+      DB_PORT: 5432
+    # No depende de 'up', solo de 'run'
