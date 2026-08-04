@@ -2,9 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - '5432:5432' # Expuesto para que el runner de GH Actions pueda conectarse si usamos red host, pero mejor usar red interna.
+      POSTGRES_PASSWORD: testpass
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s

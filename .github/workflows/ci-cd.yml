@@ -104,7 +104,20 @@ jobs:
       - name: Start Dependencies (Postgres)
         run: |
           docker compose -f compose.test.yaml up -d db
-          docker compose -f compose.test.yaml exec -T db pg_isready -U postgres
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in $(seq 1 30); do
+            if docker compose -f compose.test.yaml exec -T db pg_isready -U postgres; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Attempt $i/30: PostgreSQL not ready yet, sleeping..."
+            sleep 2
+          done
+          # Comprobación final para fallar si no está listo después de 30 intentos
+          if ! docker compose -f compose.test.yaml exec -T db pg_isready -U postgres; then
+            echo "❌ PostgreSQL failed to start within timeout"
+            exit 1
+          fi
 
       - name: Run E2E Tests
         run: |
