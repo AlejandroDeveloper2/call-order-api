@@ -125,6 +125,9 @@ jobs:
         env:
           DB_HOST: db
           DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: call-order-db
           NODE_ENV: test
 
       - name: Run Trivy vulnerability scanner
