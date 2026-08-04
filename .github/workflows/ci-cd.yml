@@ -6,179 +6,147 @@ on:
       - develop
       - main
     tags:
-      - 'v*' # Dispara publicación oficial
+      - 'v*'
   pull_request:
     branches:
       - develop
       - main
-  workflow_dispatch: # Manual trigger para debugging
+  workflow_dispatch:
 
-# === CANCELACIÓN DE WORKFLOWS OBSOLETOS ===
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# === ENTORNOS Y VARIABLES GLOBALES ===
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
   DOCKER_BUILDKIT: 1
-  BUILDKIT_PROGRESS: plain # Para logs detallados en CI
+  BUILDKIT_PROGRESS: plain
 
 jobs:
-  # =============================================
-  # JOB 1: LINT (Ejecución rápida y paralela)
-  # =============================================
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
-
       - name: Install dependencies
         run: npm ci --frozen-lockfile --no-audit
-
       - name: Run ESLint
         run: npm run lint
 
-  # =============================================
-  # JOB 2: UNIT TESTS (Paralelo a Lint)
-  # =============================================
   unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
-
       - name: Install dependencies
         run: npm ci --frozen-lockfile --no-audit
-
       - name: Run Unit Tests
-        run: npm run test # Jest en modo watch=false por defecto en CI
-
-      - name: Upload coverage artifact (opcional)
+        run: npm run test
+      - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
 
-  # =============================================
-  # JOB 3: DOCKER BUILD + INTEGRATION TESTS
-  # (Agrupamos build y e2e para usar la misma imagen)
-  # =============================================
   integration-tests:
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests] # Espera a que los rápidos terminen
+    needs: [lint, unit-tests]
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # --- NUEVO PASO: Normalizar nombres ---
+      # Normalización (obligatoria antes de cualquier uso de nombres)
       - name: Set lowercase image name and actor
         run: |
           echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           echo "ACTOR_LOWER=$(echo ${{ github.actor }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      # --- CONFIGURACIÓN DE DOCKER BUILDX Y CACHÉ ---
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           install: true
-          driver: docker-container # Necesario para cache GHA
+          driver: docker-container
 
-      # --- LOGIN EN GHCR (Necesario aunque solo hagamos load? No, pero lo dejamos listo) ---
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # Token automático de GH
+          username: ${{ env.ACTOR_LOWER }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- BUILD DE LA IMAGEN DE TEST (target: test) ---
       - name: Build Test Image with Cache
-        uses: docker/build-push-action@v5
         id: build-test
+        uses: docker/build-push-action@v5
         with:
           context: .
           target: test
-          # No la pusheamos, la cargamos localmente para ejecutar pruebas
           load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
-          # === CACHÉ INTELIGENTE ===
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:test
           cache-from: |
             type=gha,scope=${{ github.ref_name }}
             type=gha,scope=develop
             type=gha,scope=main
           cache-to: type=gha,scope=${{ github.ref_name }},mode=max
 
-      # --- LEVANTAR DEPENDENCIAS (PostgreSQL) ---
       - name: Start Dependencies (Postgres)
         run: |
           docker compose -f compose.test.yaml up -d db
-          # Esperamos a que Postgres esté realmente listo
           docker compose -f compose.test.yaml exec -T db pg_isready -U postgres
 
-      # --- EJECUTAR E2E (El core de la Opción B) ---
       - name: Run E2E Tests
         run: |
-          # Usamos 'run' para levantar un contenedor efímero de la app
-          # La red de compose se llama compose-test_default por defecto
           docker compose -f compose.test.yaml run --rm app npm run test:e2e
         env:
           DB_HOST: db
           DB_PORT: 5432
           NODE_ENV: test
 
-      # --- OPCIONAL: ESCANEO DE SEGURIDAD (Trivy) ---
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:test
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'HIGH,CRITICAL'
+
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # =============================================
-  # JOB 4: VERIFICACIÓN Y METADATOS
-  # =============================================
   verify:
     runs-on: ubuntu-latest
     needs: [integration-tests]
     if: always() && needs.integration-tests.result == 'success'
     steps:
+      # También necesitamos normalizar aquí porque usamos el nombre de la imagen
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Check Image Size
         run: |
-          IMAGE_SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test --format "{{.Size}}")
+          IMAGE_SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:test --format "{{.Size}}")
           echo "✅ Image size: $IMAGE_SIZE"
-          # Si pasa de 1GB, fallamos (control de deriva)
+          # Opcional: fallar si supera 1GB
           # if [[ "$IMAGE_SIZE" > "1.0GB" ]]; then exit 1; fi
 
-  # =============================================
-  # JOB 5: PUBLICACIÓN EN GHCR (SOLO EN MAIN/RELEASE)
-  # =============================================
   publish:
     runs-on: ubuntu-latest
     needs: [verify]
-    # Solo publicamos en push a main, o tags en cualquier rama, o push a develop (para nightly)
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       startsWith(github.ref, 'refs/tags/v') ||
@@ -190,7 +158,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-        # --- NUEVO PASO: Normalizar nombres ---
       - name: Set lowercase image name and actor
         run: |
           echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
@@ -203,15 +170,14 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ env.ACTOR_LOWER }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- GENERACIÓN DE TAGS INTELIGENTES ---
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -221,7 +187,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=develop-latest,enable=${{ github.ref == 'refs/heads/develop' }}
 
-      # --- BUILD Y PUSH DE LA IMAGEN DE PRODUCCIÓN ---
       - name: Build and push Production image
         uses: docker/build-push-action@v5
         with:
@@ -232,14 +197,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ github.ref_name }}
           cache-to: type=gha,scope=${{ github.ref_name }},mode=max
-          # BuildKit permite secretos en tiempo de build sin quemarlos en la imagen
-          secret-files: |
-            "env=.env.production" # Opcional, pero mejor usar ARG
+          # secret-files: "env=.env.production"  # Comentado por seguridad, mejor usar secrets
 
-      # --- CREACIÓN DE ARTEFACTO DE DEPLOY (para futura CD) ---
       - name: Generate Image Digest
         run: |
-          echo "IMAGE_URI=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.meta.outputs.digest }}" > image-digest.txt
+          echo "IMAGE_URI=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}@${{ steps.meta.outputs.digest }}" > image-digest.txt
+
       - name: Upload Deploy Artifact
         uses: actions/upload-artifact@v4
         with:
