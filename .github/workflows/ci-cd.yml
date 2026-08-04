@@ -1,0 +1,228 @@
+name: Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: plain
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --frozen-lockfile --no-audit
+      - name: Run ESLint
+        run: npm run lint
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --frozen-lockfile --no-audit
+      - name: Run Unit Tests
+        run: npm run test
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Normalización (obligatoria antes de cualquier uso de nombres)
+      - name: Set lowercase image name and actor
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "ACTOR_LOWER=$(echo ${{ github.actor }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver: docker-container
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.ACTOR_LOWER }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Test Image with Cache
+        id: build-test
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: test
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:test
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}
+            type=gha,scope=develop
+            type=gha,scope=main
+          cache-to: type=gha,scope=${{ github.ref_name }},mode=max
+
+      - name: Start Dependencies (Postgres)
+        run: |
+          docker compose -f compose.test.yaml up -d db
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in $(seq 1 30); do
+            if docker compose -f compose.test.yaml exec -T db pg_isready -U postgres; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Attempt $i/30: PostgreSQL not ready yet, sleeping..."
+            sleep 2
+          done
+          # Comprobación final para fallar si no está listo después de 30 intentos
+          if ! docker compose -f compose.test.yaml exec -T db pg_isready -U postgres; then
+            echo "❌ PostgreSQL failed to start within timeout"
+            exit 1
+          fi
+
+      - name: Run E2E Tests
+        run: |
+          docker compose -f compose.test.yaml run --rm app npm run test:e2e
+        env:
+          DB_HOST: db
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: call-order-db
+          NODE_ENV: test
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: always() && needs.integration-tests.result == 'success'
+    steps:
+      # También necesitamos normalizar aquí porque usamos el nombre de la imagen
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Check Image Size
+        run: |
+          IMAGE_SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:test --format "{{.Size}}")
+          echo "✅ Image size: $IMAGE_SIZE"
+          # Opcional: fallar si supera 1GB
+          # if [[ "$IMAGE_SIZE" > "1.0GB" ]]; then exit 1; fi
+
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [verify]
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')||
+      github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set lowercase image name and actor
+        run: |
+          echo "IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "ACTOR_LOWER=$(echo ${{ github.actor }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.ACTOR_LOWER }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=develop-latest,enable=${{ github.ref == 'refs/heads/develop' }}
+
+      - name: Build and push Production image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ github.ref_name }}
+          cache-to: type=gha,scope=${{ github.ref_name }},mode=max
+          # secret-files: "env=.env.production"  # Comentado por seguridad, mejor usar secrets
+
+      - name: Generate Image Digest
+        run: |
+          echo "IMAGE_URI=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}@${{ steps.meta.outputs.digest }}" > image-digest.txt
+
+      - name: Upload Deploy Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-manifest
+          path: image-digest.txt
