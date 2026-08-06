@@ -24,6 +24,7 @@ export class UsersController {
     return this.findUserByAccountUseCase.run(accountId);
   }
   @Get('/')
+  @ApiMessage('Usuarios obtenidos correctamente')
   find(@Query() userQueryDto: UserQueryDto) {
     return this.findUsers.run(userQueryDto);
   }
