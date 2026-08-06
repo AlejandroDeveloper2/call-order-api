@@ -1,8 +1,10 @@
-import { User } from '../entities';
-import { ListUserQuery, UpdateUserInput } from '../types';
+import { PaginatedResponse } from '../../../shared/domain/types';
+import { UpdateUserInput } from '../types';
+
+import { User, UserSearchQuery } from '../entities';
 
 export abstract class UserRepositoryPort {
-  abstract find(query: Partial<ListUserQuery>): Promise<User[]>;
+  abstract find(query: UserSearchQuery): Promise<PaginatedResponse<User>>;
   abstract findByAccountId(accountId: string): Promise<User | null>;
   abstract create(user: User): Promise<void>;
   abstract update(

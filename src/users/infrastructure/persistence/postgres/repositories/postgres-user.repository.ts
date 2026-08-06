@@ -5,18 +5,15 @@ import { Repository } from 'typeorm';
 /** Puertos */
 import { UserRepositoryPort } from '../../../../domain/ports';
 /** Entidades de dominio */
-import { User } from '../../../../domain/entities';
+import { User, UserSearchQuery } from '../../../../domain/entities';
 /** Tipos de dominio */
-import {
-  ListUserQuery,
-  UpdateUserInput,
-  UserStatus,
-} from '../../../../domain/types';
+import { UpdateUserInput, UserStatus } from '../../../../domain/types';
 
 /**  Esquema de base de datos */
 import { PostgresUserSchema } from '../schemas';
 /** Mapper */
 import { UserMapper } from '../mappers';
+import { PaginatedResponse } from '../../../../../shared/domain/types';
 
 @Injectable()
 export class PostgresUserRepository implements UserRepositoryPort {
@@ -25,7 +22,8 @@ export class PostgresUserRepository implements UserRepositoryPort {
     private readonly repository: Repository<PostgresUserSchema>,
   ) {}
 
-  async find(query: Partial<ListUserQuery>): Promise<User[]> {
+  async find(query: UserSearchQuery): Promise<PaginatedResponse<User>> {
+    const { limit = 10, offset = 0 } = query;
     const qb = this.repository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
@@ -52,9 +50,18 @@ export class PostgresUserRepository implements UserRepositoryPort {
     if (query.roleId)
       qb.andWhere('user.roleId = :roleId', { roleId: query.roleId });
 
-    const schemas = await qb.getMany();
+    qb.skip(offset).take(limit);
 
-    return schemas.map((schema) => UserMapper.toDomain(schema));
+    const [schemas, totalRecords] = await qb.getManyAndCount();
+    const page = Math.floor(offset / limit) + 1;
+    const totalPages = limit > 0 ? Math.ceil(totalRecords / limit) : 0;
+
+    return {
+      records: schemas.map((schema) => UserMapper.toDomain(schema)),
+      page,
+      totalPages,
+      totalRecords,
+    };
   }
   async findByAccountId(accountId: string): Promise<User | null> {
     const schema = await this.repository.findOneBy({ accountId });

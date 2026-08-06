@@ -13,8 +13,15 @@ interface ApiResponse<T> {
   httpCode: number;
 }
 
+interface PaginatedResponse<T> {
+  records: T[];
+  page: number;
+  totalPages: number;
+  totalRecords: number;
+}
+
 interface JwtPayload {
   accountId: string;
 }
 
-export { ServerErrorResponse, ApiResponse, JwtPayload };
+export { ServerErrorResponse, ApiResponse, JwtPayload, PaginatedResponse };
