@@ -3,11 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 /** */
-import { RolePermissionRepositoryPort } from '../../../domain/ports';
-import { RolePermission } from '../../../domain/entities';
+import { RolePermissionRepositoryPort } from '../../../../domain/ports';
+import { RolePermission } from '../../../../domain/entities';
 
 /** Esquema de base de datos para permisos de rol */
-import { PostgresRolePermissionSchema } from './postgres-role-permission.schema';
+import { PostgresRolePermissionSchema } from '../schemas';
 
 @Injectable()
 export class PostgresRolePermissionRepository implements RolePermissionRepositoryPort {

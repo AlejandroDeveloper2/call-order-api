@@ -3,12 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 /** Puertos */
-import { RoleRepositoryPort } from '../../../domain/ports';
+import { RoleRepositoryPort } from '../../../../domain/ports';
 /** Entidad de dominio */
-import { Role } from '../../../domain/entities';
+import { Role } from '../../../../domain/entities';
 
 /** Esquema de base de datos*/
-import { PostgresRoleSchema } from './postgres-role.schema';
+import { PostgresRoleSchema } from '../schemas';
 
 @Injectable()
 export class PostgresRoleRepository implements RoleRepositoryPort {

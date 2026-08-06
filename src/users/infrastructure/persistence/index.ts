@@ -1,3 +1,4 @@
-export * from './postgres-user-repository/postgres-user.repository';
-export * from './postgres-role-repository/postgres-role.repository';
-export * from './postgres-permission-repository/postgres-permission.repository';
+export * from './postgres/repositories/postgres-user.repository';
+export * from './postgres/repositories/postgres-role.repository';
+export * from './postgres/repositories/postgres-permission.repository';
+export * from './postgres/repositories/postgres-role-permission.repository';

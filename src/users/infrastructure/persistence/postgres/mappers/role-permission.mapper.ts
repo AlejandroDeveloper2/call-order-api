@@ -1,6 +1,6 @@
-import { RolePermission } from '../../../domain/entities';
+import { RolePermission } from '../../../../domain/entities';
 
-import { PostgresRolePermissionSchema } from './postgres-role-permission.schema';
+import { PostgresRolePermissionSchema } from '../schemas';
 
 export class RolePermissionMapper {
   static toDomain(schema: PostgresRolePermissionSchema): RolePermission {

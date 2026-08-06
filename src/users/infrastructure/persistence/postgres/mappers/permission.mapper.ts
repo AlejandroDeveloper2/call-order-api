@@ -1,8 +1,8 @@
 /** Entidad de dominio */
-import { Permission } from '../../../domain/entities';
+import { Permission } from '../../../../domain/entities';
 
 /** Mapper for converting between Permission domain entity and PostgresPermissionSchema */
-import { PostgresPermissionSchema } from './postgres-permission.schema';
+import { PostgresPermissionSchema } from '../schemas';
 
 export class PermissionMapper {
   static toDomain(schema: PostgresPermissionSchema): Permission {

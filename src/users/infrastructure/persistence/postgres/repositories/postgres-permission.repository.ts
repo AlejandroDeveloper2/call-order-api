@@ -1,16 +1,18 @@
 import { InjectRepository } from '@nestjs/typeorm';
+import { Injectable } from '@nestjs/common';
 import { Repository } from 'typeorm';
 
 /** Puertos */
-import { PermissionRepositoryPort } from '../../../domain/ports';
+import { PermissionRepositoryPort } from '../../../../domain/ports';
 /** Entidades de dominio */
-import { Permission } from '../../../domain/entities';
+import { Permission } from '../../../../domain/entities';
 
 /** Esquema de base de datos */
-import { PostgresPermissionSchema } from './postgres-permission.schema';
+import { PostgresPermissionSchema } from '../schemas';
 /** Función para mapear o transformar de entidad de dominio a esquema o biseversa  */
-import { PermissionMapper } from './permission.mapper';
+import { PermissionMapper } from '../mappers';
 
+@Injectable()
 export class PostgresPermissionRepository implements PermissionRepositoryPort {
   constructor(
     @InjectRepository(PostgresPermissionSchema)

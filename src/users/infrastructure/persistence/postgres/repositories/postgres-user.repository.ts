@@ -3,20 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 /** Puertos */
-import { UserRepositoryPort } from '../../../domain/ports';
+import { UserRepositoryPort } from '../../../../domain/ports';
 /** Entidades de dominio */
-import { User } from '../../../domain/entities';
+import { User } from '../../../../domain/entities';
 /** Tipos de dominio */
 import {
   ListUserQuery,
   UpdateUserInput,
   UserStatus,
-} from '../../../domain/types';
+} from '../../../../domain/types';
 
 /**  Esquema de base de datos */
-import { PostgresUserSchema } from './postgres-user.schema';
+import { PostgresUserSchema } from '../schemas';
 /** Mapper */
-import { UserMapper } from './user.mapper';
+import { UserMapper } from '../mappers';
 
 @Injectable()
 export class PostgresUserRepository implements UserRepositoryPort {

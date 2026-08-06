@@ -1,6 +1,6 @@
-import { Account, Role, User } from '../../../domain/entities';
+import { Account, Role, User } from '../../../../domain/entities';
 
-import { PostgresUserSchema } from './postgres-user.schema';
+import { PostgresUserSchema } from '../schemas/postgres-user.schema';
 
 export class UserMapper {
   static toDomain(schema: PostgresUserSchema): User {

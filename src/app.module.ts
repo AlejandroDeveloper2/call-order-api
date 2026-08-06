@@ -19,6 +19,14 @@ import { BranchesModule } from './branches/branches.module';
 
 import { ApiResponseInterceptor } from './shared/infrastructure/interceptors/api-response.interceptor';
 
+import {
+  PostgresUserSchema,
+  PostgresAccountSchema,
+  PostgresRoleSchema,
+  PostgresPermissionSchema,
+  PostgresRolePermissionSchema,
+} from './users/infrastructure/persistence/postgres/schemas';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -35,7 +43,13 @@ import { ApiResponseInterceptor } from './shared/infrastructure/interceptors/api
         username: config.get<string>('DB_USERNAME', 'postgres'),
         password: config.get<string>('DB_PASSWORD', 'postgres'),
         database: config.get<string>('DB_NAME', 'call-order-db'),
-        entities: [],
+        entities: [
+          PostgresUserSchema,
+          PostgresAccountSchema,
+          PostgresRoleSchema,
+          PostgresPermissionSchema,
+          PostgresRolePermissionSchema,
+        ],
         synchronize: true,
         retryAttempts: 3,
         retryDelay: 2000,

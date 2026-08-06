@@ -1,6 +1,6 @@
-import { Role } from '../../../domain/entities';
+import { Role } from '../../../../domain/entities';
 
-import { PostgresRoleSchema } from './postgres-role.schema';
+import { PostgresRoleSchema } from '../schemas';
 
 export class RoleMapper {
   static toDomain(schema: PostgresRoleSchema): Role {

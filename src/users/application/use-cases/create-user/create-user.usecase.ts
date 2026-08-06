@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import uuid from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 
 /** Entidad de dominio */
 import { User } from '../../../domain/entities';
@@ -38,7 +38,7 @@ export class CreateUserUseCase {
         true,
       );
 
-    const userId = uuid.v4();
+    const userId = uuidv4();
 
     const user = new User(
       userId,

@@ -5,3 +5,4 @@ export abstract class PermissionRepositoryPort {
   abstract findByCode(permissionCode: string): Promise<Permission | null>;
   abstract createMany(permissions: Permission[]): Promise<void>;
 }
+export const PERMISSION_REPOSITORY = 'PERMISSION_REPOSITORY';

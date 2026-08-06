@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 
 import { PostgresAccountSchema } from './postgres-account.schema';
-import { PostgresRoleSchema } from '../postgres-role-repository/postgres-role.schema';
+import { PostgresRoleSchema } from './postgres-role.schema';
 
 @Entity('users')
 export class PostgresUserSchema {

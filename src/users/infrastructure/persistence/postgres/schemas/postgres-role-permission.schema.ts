@@ -5,29 +5,28 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   JoinColumn,
-  OneToOne,
+  ManyToOne,
 } from 'typeorm';
 
-import { Permission, Role } from '../../../domain/entities';
+import { PostgresPermissionSchema } from './postgres-permission.schema';
+import { PostgresRoleSchema } from './postgres-role.schema';
 
-@Entity('roles')
+@Entity('role_permissions')
 export class PostgresRolePermissionSchema {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @OneToOne(() => Permission, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(() => PostgresPermissionSchema, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'permissionId' })
-  permission!: Permission;
+  permission!: PostgresPermissionSchema;
 
   @Column()
   permissionId!: string;
 
-  @OneToOne(() => Role, {
-    onDelete: 'NO ACTION',
-  })
+  @ManyToOne(() => PostgresRoleSchema, { onDelete: 'NO ACTION' })
   @JoinColumn({ name: 'roleId' })
+  role!: PostgresRoleSchema;
+
   @Column()
   roleId!: string;
 
