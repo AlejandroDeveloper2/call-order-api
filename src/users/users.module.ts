@@ -29,6 +29,7 @@ import {
   PostgresPermissionSchema,
   PostgresRolePermissionSchema,
 } from './infrastructure/persistence/postgres/schemas';
+import { FindUsersUseCase } from './application/use-cases';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import {
   providers: [
     CreateUserUseCase,
     FindUserByAccountUseCase,
+    FindUsersUseCase,
     { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
     { provide: ROLE_REPOSITORY, useClass: PostgresRoleRepository },
     { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },

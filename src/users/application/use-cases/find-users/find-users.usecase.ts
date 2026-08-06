@@ -27,8 +27,6 @@ export class FindUsersUseCase {
       phone,
       roleId,
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const paginatedUsers = await this.userRepository.find(userQuery);
-    return paginatedUsers;
+    return await this.userRepository.find(userQuery);
   }
 }
