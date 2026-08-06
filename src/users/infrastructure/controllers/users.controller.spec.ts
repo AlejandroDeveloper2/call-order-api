@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { User } from '../../domain/entities';
 
-import { FindUserByAccountUseCase } from '../../application/use-cases';
+import {
+  FindUserByAccountUseCase,
+  FindUsersUseCase,
+} from '../../application/use-cases';
+import { UserQueryDto } from '../../application/dto';
 
 import { UsersController } from './users.controller';
 
@@ -27,11 +31,25 @@ describe('UsersController', () => {
     },
     { roleId: 'role-1', name: 'Administrador' },
   );
+  const expectedPaginatedList = {
+    records: [expectedUser],
+    page: 1,
+    totalPages: 1,
+    totalRecords: 1,
+  };
 
-  const mockUseCase = {
+  const mockFindUserByAccountUseCase = {
     run: jest.fn().mockResolvedValue({
       data: expectedUser,
       message: 'Perfil de usuario obtenido correctamente',
+      httpCode: 200,
+    }),
+  };
+
+  const mockFindUsersUseCase = {
+    run: jest.fn().mockResolvedValue({
+      data: expectedPaginatedList,
+      message: 'Usuarios obtenidos correctamente',
       httpCode: 200,
     }),
   };
@@ -42,8 +60,9 @@ describe('UsersController', () => {
       providers: [
         {
           provide: FindUserByAccountUseCase,
-          useValue: mockUseCase,
+          useValue: mockFindUserByAccountUseCase,
         },
+        { provide: FindUsersUseCase, useValue: mockFindUsersUseCase },
       ],
     }).compile();
 
@@ -56,6 +75,16 @@ describe('UsersController', () => {
     await expect(controller.findByAccountId(accountId)).resolves.toEqual({
       data: expectedUser,
       message: 'Perfil de usuario obtenido correctamente',
+      httpCode: 200,
+    });
+  });
+
+  it('deberia devolver un listado paginado de usuarios segun una query', async () => {
+    const query: UserQueryDto = {};
+
+    await expect(controller.find(query)).resolves.toEqual({
+      data: expectedPaginatedList,
+      message: 'Usuarios obtenidos correctamente',
       httpCode: 200,
     });
   });

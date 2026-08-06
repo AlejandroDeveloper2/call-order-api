@@ -1,7 +1,4 @@
-enum UserStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-}
+type UserStatusType = 'active' | 'inactive';
 
 interface UpdateUserInput {
   fullname?: string;
@@ -9,4 +6,4 @@ interface UpdateUserInput {
   phone?: string;
 }
 
-export { UserStatus, UpdateUserInput };
+export { UserStatusType, UpdateUserInput };

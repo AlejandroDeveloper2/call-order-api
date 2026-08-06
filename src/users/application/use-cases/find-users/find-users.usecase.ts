@@ -17,15 +17,14 @@ export class FindUsersUseCase {
     private readonly userRepository: UserRepositoryPort,
   ) {}
   async run(query: UserQueryDto): Promise<PaginatedResponse<User>> {
-    const { limit, offset, status, fullname, email, phone, roleId } = query;
     const userQuery = new UserSearchQuery(
-      limit,
-      offset,
-      status,
-      fullname,
-      email,
-      phone,
-      roleId,
+      query.limit,
+      query.offset,
+      query.status,
+      query.fullname,
+      query.email,
+      query.phone,
+      query.roleId,
     );
     return await this.userRepository.find(userQuery);
   }

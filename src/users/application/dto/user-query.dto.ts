@@ -4,13 +4,13 @@ import {
   IsOptional,
   IsPositive,
   Min,
-  IsEnum,
   IsString,
   IsEmail,
   IsUUID,
+  IsIn,
 } from 'class-validator';
 
-import { UserStatus } from '../../domain/types';
+import type { UserStatusType } from '../../domain/types';
 
 export class UserQueryDto {
   @IsOptional()
@@ -25,8 +25,9 @@ export class UserQueryDto {
   offset?: number;
 
   @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
+  @IsString()
+  @IsIn(['active', 'inactive'])
+  status?: UserStatusType;
 
   @IsOptional()
   @IsString()

@@ -7,7 +7,7 @@ import { UserRepositoryPort } from '../../../../domain/ports';
 /** Entidades de dominio */
 import { User, UserSearchQuery } from '../../../../domain/entities';
 /** Tipos de dominio */
-import { UpdateUserInput, UserStatus } from '../../../../domain/types';
+import { UpdateUserInput } from '../../../../domain/types';
 import { PaginatedResponse } from '../../../../../shared/domain/types';
 /** Utilidades de dominio */
 import { handleServerError } from '../../../../../shared/domain/utils/handleServerError';
@@ -34,7 +34,7 @@ export class PostgresUserRepository implements UserRepositoryPort {
 
       if (query.status)
         qb.andWhere('user.isActive = :status', {
-          status: query.status === UserStatus.ACTIVE,
+          status: query.status === 'active',
         });
 
       if (query.fullname)
