@@ -7,17 +7,25 @@ import {
   Query,
 } from '@nestjs/common';
 
+/** Casos de uso */
 import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
+  UpdateUserStatusUseCase,
 } from '../../application/use-cases';
 
+/** Decoradores */
 import {
   ApiMessage,
   GetAccount,
 } from '../../../shared/infrastructure/decorators';
-import { UpdateUserDto, UserQueryDto } from '../../application/dto';
+/** Dtos */
+import {
+  UpdateUserDto,
+  UpdateUserStatusDto,
+  UserQueryDto,
+} from '../../application/dto';
 
 @Controller('users')
 export class UsersController {
@@ -25,6 +33,7 @@ export class UsersController {
     private readonly findUserByAccountUseCase: FindUserByAccountUseCase,
     private readonly findUsersUseCase: FindUsersUseCase,
     private readonly updateProfileUseCase: UpdateProfileUseCase,
+    private readonly updateUserStatusUseCase: UpdateUserStatusUseCase,
   ) {}
 
   @Get('/account')
@@ -44,5 +53,14 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.updateProfileUseCase.run(profileId, updateUserDto);
+  }
+
+  @Patch('/status')
+  @ApiMessage('Estado del usuario actualizado correctamente')
+  updateStatus(
+    @GetAccount('profileId', ParseUUIDPipe) profileId: string,
+    @Body() updateUserStatusDto: UpdateUserStatusDto,
+  ) {
+    return this.updateUserStatusUseCase.run(profileId, updateUserStatusDto);
   }
 }

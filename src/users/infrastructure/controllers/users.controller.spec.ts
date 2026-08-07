@@ -6,8 +6,9 @@ import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
+  UpdateUserStatusUseCase,
 } from '../../application/use-cases';
-import { UserQueryDto } from '../../application/dto';
+import { UserQueryDto, UpdateUserStatusDto } from '../../application/dto';
 
 import { UsersController } from './users.controller';
 
@@ -63,6 +64,14 @@ describe('UsersController', () => {
     }),
   };
 
+  const mockUpdateUserStatusUseCase = {
+    run: jest.fn().mockResolvedValue({
+      data: null,
+      message: 'Estado del usuario actualizado correctamente',
+      httpCode: 200,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
@@ -73,6 +82,10 @@ describe('UsersController', () => {
         },
         { provide: FindUsersUseCase, useValue: mockFindUsersUseCase },
         { provide: UpdateProfileUseCase, useValue: mockUpdateProfileUseCase },
+        {
+          provide: UpdateUserStatusUseCase,
+          useValue: mockUpdateUserStatusUseCase,
+        },
       ],
     }).compile();
 
@@ -110,6 +123,28 @@ describe('UsersController', () => {
     ).resolves.toEqual({
       data: null,
       message: 'Perfil de usuario actualizado correctamente',
+      httpCode: 200,
+    });
+  });
+
+  it('deberia actualizar el estado de un perfil de usuario que corresponde a un determinado id', async () => {
+    const profileId = 'test-user-id';
+    const statusToUpdate1: UpdateUserStatusDto = { status: 'active' };
+    const statusToUpdate2: UpdateUserStatusDto = { status: 'inactive' };
+
+    await expect(
+      controller.updateStatus(profileId, statusToUpdate1),
+    ).resolves.toEqual({
+      data: null,
+      message: 'Estado del usuario actualizado correctamente',
+      httpCode: 200,
+    });
+
+    await expect(
+      controller.updateStatus(profileId, statusToUpdate2),
+    ).resolves.toEqual({
+      data: null,
+      message: 'Estado del usuario actualizado correctamente',
       httpCode: 200,
     });
   });

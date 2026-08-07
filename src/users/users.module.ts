@@ -15,10 +15,13 @@ import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
+  UpdateUserStatusUseCase,
 } from './application/use-cases';
 
+/** Controladores */
 import { UsersController } from './infrastructure/controllers/users.controller';
 
+/** Repositorios */
 import {
   PostgresPermissionRepository,
   PostgresRoleRepository,
@@ -26,6 +29,7 @@ import {
   PostgresRolePermissionRepository,
 } from './infrastructure/persistence/postgres/repositories';
 
+/** Esquemas */
 import {
   PostgresUserSchema,
   PostgresAccountSchema,
@@ -50,6 +54,7 @@ import {
     FindUserByAccountUseCase,
     FindUsersUseCase,
     UpdateProfileUseCase,
+    UpdateUserStatusUseCase,
     { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
     { provide: ROLE_REPOSITORY, useClass: PostgresRoleRepository },
     { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },
