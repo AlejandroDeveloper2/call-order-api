@@ -22,6 +22,8 @@ interface PaginatedResponse<T> {
 
 interface JwtPayload {
   accountId: string;
+  roleId: string;
+  profileId: string;
 }
 
 export { ServerErrorResponse, ApiResponse, JwtPayload, PaginatedResponse };

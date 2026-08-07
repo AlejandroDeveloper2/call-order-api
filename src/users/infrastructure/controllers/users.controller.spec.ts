@@ -5,6 +5,7 @@ import { User } from '../../domain/entities';
 import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
+  UpdateProfileUseCase,
 } from '../../application/use-cases';
 import { UserQueryDto } from '../../application/dto';
 
@@ -54,6 +55,14 @@ describe('UsersController', () => {
     }),
   };
 
+  const mockUpdateProfileUseCase = {
+    run: jest.fn().mockResolvedValue({
+      data: null,
+      message: 'Perfil de usuario actualizado correctamente',
+      httpCode: 200,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
@@ -63,6 +72,7 @@ describe('UsersController', () => {
           useValue: mockFindUserByAccountUseCase,
         },
         { provide: FindUsersUseCase, useValue: mockFindUsersUseCase },
+        { provide: UpdateProfileUseCase, useValue: mockUpdateProfileUseCase },
       ],
     }).compile();
 
@@ -85,6 +95,21 @@ describe('UsersController', () => {
     await expect(controller.find(query)).resolves.toEqual({
       data: expectedPaginatedList,
       message: 'Usuarios obtenidos correctamente',
+      httpCode: 200,
+    });
+  });
+
+  it('deberia actualizar el perfil de un usuario que corresponde a un determinado id', async () => {
+    const profileId = 'test-user-id';
+    const profileToUpdate = {
+      fullname: 'Luis Casas',
+      phone: '3154667899',
+    };
+    await expect(
+      controller.update(profileId, profileToUpdate),
+    ).resolves.toEqual({
+      data: null,
+      message: 'Perfil de usuario actualizado correctamente',
       httpCode: 200,
     });
   });

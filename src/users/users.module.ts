@@ -10,8 +10,12 @@ import {
 } from './domain/ports';
 
 /** Casos de uso */
-import { CreateUserUseCase } from './application/use-cases/create-user/create-user.usecase';
-import { FindUserByAccountUseCase } from './application/use-cases/find-user-by-account/find-user-by-account.usecase';
+import {
+  CreateUserUseCase,
+  FindUserByAccountUseCase,
+  FindUsersUseCase,
+  UpdateProfileUseCase,
+} from './application/use-cases';
 
 import { UsersController } from './infrastructure/controllers/users.controller';
 
@@ -29,7 +33,6 @@ import {
   PostgresPermissionSchema,
   PostgresRolePermissionSchema,
 } from './infrastructure/persistence/postgres/schemas';
-import { FindUsersUseCase } from './application/use-cases';
 
 @Module({
   imports: [
@@ -46,6 +49,7 @@ import { FindUsersUseCase } from './application/use-cases';
     CreateUserUseCase,
     FindUserByAccountUseCase,
     FindUsersUseCase,
+    UpdateProfileUseCase,
     { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
     { provide: ROLE_REPOSITORY, useClass: PostgresRoleRepository },
     { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },

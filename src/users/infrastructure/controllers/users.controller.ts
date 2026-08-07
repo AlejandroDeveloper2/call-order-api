@@ -1,21 +1,30 @@
-import { Body, Controller, Get, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  ParseUUIDPipe,
+  Patch,
+  Query,
+} from '@nestjs/common';
 
 import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
+  UpdateProfileUseCase,
 } from '../../application/use-cases';
 
 import {
   ApiMessage,
   GetAccount,
 } from '../../../shared/infrastructure/decorators';
-import { UserQueryDto } from '../../application/dto';
+import { UpdateUserDto, UserQueryDto } from '../../application/dto';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly findUserByAccountUseCase: FindUserByAccountUseCase,
-    private readonly findUsers: FindUsersUseCase,
+    private readonly findUsersUseCase: FindUsersUseCase,
+    private readonly updateProfileUseCase: UpdateProfileUseCase,
   ) {}
 
   @Get('/account')
@@ -26,6 +35,14 @@ export class UsersController {
   @Get('/')
   @ApiMessage('Usuarios obtenidos correctamente')
   find(@Query() userQueryDto: UserQueryDto) {
-    return this.findUsers.run(userQueryDto);
+    return this.findUsersUseCase.run(userQueryDto);
+  }
+  @Patch('/')
+  @ApiMessage('Perfil de usuario actualizado correctamente')
+  update(
+    @GetAccount('profileId', ParseUUIDPipe) profileId: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.updateProfileUseCase.run(profileId, updateUserDto);
   }
 }
