@@ -11,9 +11,9 @@ export const GetAccount = createParamDecorator(
 
     if (!account)
       throw new AppError(
-        SHARED_ERROR_CODES.jwtPayloadNotProvided,
-        400,
-        'JWT payload not provided',
+        SHARED_ERROR_CODES.notAuthenticated,
+        401,
+        'Usuario no autenticado',
         true,
       );
     if (!data) return account;
