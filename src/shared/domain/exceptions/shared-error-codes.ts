@@ -3,5 +3,7 @@ export const SHARED_ERROR_CODES = {
   internalServerError: 'INTERNAL_SERVER_ERROR',
   emailSendingError: 'EMAIL_SENDING_ERROR',
   validationError: 'VALIDATION_ERROR',
-  jwtPayloadNotProvided: 'JWT_PAYLOAD_NOT_PROVIDED',
+  notAuthenticated: 'NOT_AUTHENTICATED',
+  imageUploadError: 'IMAGE_UPLOAD_ERROR',
+  fileNotProvided: 'FILE_NOT_PROVIDED',
 };
