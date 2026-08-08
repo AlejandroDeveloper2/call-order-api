@@ -24,6 +24,7 @@ interface JwtPayload {
   accountId: string;
   roleId: string;
   profileId: string;
+  permissions: string[];
 }
 
 export { ServerErrorResponse, ApiResponse, JwtPayload, PaginatedResponse };

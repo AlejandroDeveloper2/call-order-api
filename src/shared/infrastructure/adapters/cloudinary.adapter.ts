@@ -34,7 +34,7 @@ export class CloudinaryAdpater implements FileUploaderPort<
                 SHARED_ERROR_CODES.imageUploadError,
                 error.http_code,
                 error.message,
-                true,
+                false,
               ),
             );
           resolve(result as UploadApiResponse);
