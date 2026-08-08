@@ -4,4 +4,6 @@ export const SHARED_ERROR_CODES = {
   emailSendingError: 'EMAIL_SENDING_ERROR',
   validationError: 'VALIDATION_ERROR',
   jwtPayloadNotProvided: 'JWT_PAYLOAD_NOT_PROVIDED',
+  imageUploadError: 'IMAGE_UPLOAD_ERROR',
+  fileNotProvided: 'FILE_NOT_PROVIDED',
 };

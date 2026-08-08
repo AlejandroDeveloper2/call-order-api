@@ -1,11 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { NodeMailerAdapter } from './infrastructure/adapters/nodemailer.adapter';
+import {
+  CloudinaryAdpater,
+  NodeMailerAdapter,
+} from './infrastructure/adapters';
+
+import { CloudinaryUploadInterceptor } from './infrastructure/interceptors';
 
 @Module({
   imports: [ConfigModule],
-  providers: [NodeMailerAdapter],
-  exports: [NodeMailerAdapter],
+  providers: [
+    NodeMailerAdapter,
+    CloudinaryAdpater,
+    CloudinaryUploadInterceptor,
+  ],
+  exports: [NodeMailerAdapter, CloudinaryAdpater, CloudinaryUploadInterceptor],
 })
 export class SharedModule {}

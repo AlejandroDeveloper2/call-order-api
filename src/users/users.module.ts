@@ -15,6 +15,7 @@ import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
+  UpdateUserAvatarUseCase,
   UpdateUserStatusUseCase,
 } from './application/use-cases';
 
@@ -38,8 +39,12 @@ import {
   PostgresRolePermissionSchema,
 } from './infrastructure/persistence/postgres/schemas';
 
+/** Módulos */
+import { SharedModule } from '../shared/shared.module';
+
 @Module({
   imports: [
+    SharedModule,
     TypeOrmModule.forFeature([
       PostgresUserSchema,
       PostgresAccountSchema,
@@ -55,6 +60,7 @@ import {
     FindUsersUseCase,
     UpdateProfileUseCase,
     UpdateUserStatusUseCase,
+    UpdateUserAvatarUseCase,
     { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
     { provide: ROLE_REPOSITORY, useClass: PostgresRoleRepository },
     { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },

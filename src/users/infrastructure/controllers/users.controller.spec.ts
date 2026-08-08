@@ -6,11 +6,14 @@ import {
   FindUserByAccountUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
+  UpdateUserAvatarUseCase,
   UpdateUserStatusUseCase,
 } from '../../application/use-cases';
 import { UserQueryDto, UpdateUserStatusDto } from '../../application/dto';
 
 import { UsersController } from './users.controller';
+
+import { SharedModule } from '../../../shared/shared.module';
 
 jest.mock('uuid', () => ({
   v4: () => 'test-user-id',
@@ -72,8 +75,17 @@ describe('UsersController', () => {
     }),
   };
 
+  const mockUpdateUserAvatarUseCase = {
+    run: jest.fn().mockResolvedValue({
+      data: null,
+      message: 'Avatar actualizado correctamente',
+      httpCode: 200,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [SharedModule],
       controllers: [UsersController],
       providers: [
         {
@@ -86,6 +98,10 @@ describe('UsersController', () => {
           provide: UpdateUserStatusUseCase,
           useValue: mockUpdateUserStatusUseCase,
         },
+        {
+          provide: UpdateUserAvatarUseCase,
+          useValue: mockUpdateUserAvatarUseCase,
+        },
       ],
     }).compile();
 
@@ -95,7 +111,7 @@ describe('UsersController', () => {
   it('deberia devolver el perfil del usuario que coincida con el accountId', async () => {
     const accountId: string = 'test-account-id';
 
-    await expect(controller.findByAccountId(accountId)).resolves.toEqual({
+    await expect(controller.getByAccountId(accountId)).resolves.toEqual({
       data: expectedUser,
       message: 'Perfil de usuario obtenido correctamente',
       httpCode: 200,
@@ -105,7 +121,7 @@ describe('UsersController', () => {
   it('deberia devolver un listado paginado de usuarios segun una query', async () => {
     const query: UserQueryDto = {};
 
-    await expect(controller.find(query)).resolves.toEqual({
+    await expect(controller.getUsers(query)).resolves.toEqual({
       data: expectedPaginatedList,
       message: 'Usuarios obtenidos correctamente',
       httpCode: 200,
@@ -119,7 +135,7 @@ describe('UsersController', () => {
       phone: '3154667899',
     };
     await expect(
-      controller.update(profileId, profileToUpdate),
+      controller.patchProfile(profileId, profileToUpdate),
     ).resolves.toEqual({
       data: null,
       message: 'Perfil de usuario actualizado correctamente',
@@ -133,7 +149,7 @@ describe('UsersController', () => {
     const statusToUpdate2: UpdateUserStatusDto = { status: 'inactive' };
 
     await expect(
-      controller.updateStatus(profileId, statusToUpdate1),
+      controller.patchUserStatus(profileId, statusToUpdate1),
     ).resolves.toEqual({
       data: null,
       message: 'Estado del usuario actualizado correctamente',
@@ -141,10 +157,23 @@ describe('UsersController', () => {
     });
 
     await expect(
-      controller.updateStatus(profileId, statusToUpdate2),
+      controller.patchUserStatus(profileId, statusToUpdate2),
     ).resolves.toEqual({
       data: null,
       message: 'Estado del usuario actualizado correctamente',
+      httpCode: 200,
+    });
+  });
+
+  it('deberia actualizar el avatar del usuario', async () => {
+    const profileId = 'test-user-id';
+    const avatarUrl = 'avatar-url';
+
+    await expect(
+      controller.patchUserAvatar(profileId, avatarUrl),
+    ).resolves.toEqual({
+      data: null,
+      message: 'Avatar actualizado correctamente',
       httpCode: 200,
     });
   });
