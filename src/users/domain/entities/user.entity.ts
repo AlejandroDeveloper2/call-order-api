@@ -1,4 +1,4 @@
-import { Account } from './account.entity';
+import { Account } from '../../../auth/domain/entities';
 import { Role } from './role.entity';
 
 export class User {

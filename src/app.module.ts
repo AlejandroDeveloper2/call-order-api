@@ -19,13 +19,16 @@ import { BranchesModule } from './branches/branches.module';
 
 import { ApiResponseInterceptor } from './shared/infrastructure/interceptors/api-response.interceptor';
 
+/** Schemas del módulo de usuarios */
 import {
   PostgresUserSchema,
-  PostgresAccountSchema,
   PostgresRoleSchema,
   PostgresPermissionSchema,
   PostgresRolePermissionSchema,
 } from './users/infrastructure/persistence/postgres/schemas';
+
+/** Schemas del módulo de autenticación */
+import { PostgresAccountSchema } from './auth/infrastructure/persistence/postgres/schemas';
 
 @Module({
   imports: [

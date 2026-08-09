@@ -33,6 +33,10 @@ describe('UsersController', () => {
     {
       accountId: 'test-account-id',
       email: 'juan@gmail.com',
+      passwordHash: 'hash',
+      mustChangePassword: false,
+      lastLoginAt: new Date(),
+      failedAttempts: 0,
     },
     { roleId: 'role-1', name: 'Administrador' },
   );

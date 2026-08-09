@@ -11,8 +11,23 @@ export class PostgresAccountSchema {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column()
+  @Column({ unique: true })
   email!: string;
+
+  @Column()
+  passwordHash!: string;
+
+  @Column({ default: false })
+  mustChangePassword!: boolean;
+
+  @Column({ type: 'date' })
+  lastLoginAt!: Date;
+
+  @Column()
+  failedAttempts!: number;
+
+  @Column({ type: 'date', nullable: true })
+  lockedUtil?: Date;
 
   @CreateDateColumn()
   createdAt!: Date;

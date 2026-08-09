@@ -1,4 +1,5 @@
-import { Account, Role, User } from '../../../../domain/entities';
+import { Account } from '../../../../../auth/domain/entities';
+import { Role, User } from '../../../../domain/entities';
 
 import { PostgresUserSchema } from '../schemas/postgres-user.schema';
 
@@ -13,7 +14,15 @@ export class UserMapper {
       schema.phone,
       schema.isActive,
       schema.account
-        ? new Account(schema.account.id, schema.account.email)
+        ? new Account(
+            schema.account.id,
+            schema.account.email,
+            schema.account.passwordHash,
+            schema.account.mustChangePassword,
+            schema.account.lastLoginAt,
+            schema.account.failedAttempts,
+            schema.account.lockedUtil,
+          )
         : undefined,
       schema.role ? new Role(schema.role.id, schema.role.name) : undefined,
     );

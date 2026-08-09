@@ -9,7 +9,7 @@ import {
   OneToOne,
 } from 'typeorm';
 
-import { PostgresAccountSchema } from './postgres-account.schema';
+import { PostgresAccountSchema } from '../../../../../auth/infrastructure/persistence/postgres/schemas';
 import { PostgresRoleSchema } from './postgres-role.schema';
 
 @Entity('users')
