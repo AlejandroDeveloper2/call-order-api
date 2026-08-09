@@ -1,5 +1,7 @@
 import { VerificationCodeType } from '../types';
 
+import { Account } from './account.entity';
+
 export class VerificationCode {
   constructor(
     public readonly verificationCodeId: string,
@@ -9,5 +11,6 @@ export class VerificationCode {
     public expiresAt: Date,
     public attempts: number,
     public usedAt?: Date,
+    public account?: Account,
   ) {}
 }

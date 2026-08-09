@@ -28,7 +28,11 @@ import {
 } from './users/infrastructure/persistence/postgres/schemas';
 
 /** Schemas del módulo de autenticación */
-import { PostgresAccountSchema } from './auth/infrastructure/persistence/postgres/schemas';
+import {
+  PostgresAccountSchema,
+  PostgresSessionSchema,
+  PostgresVerificationCodeSchema,
+} from './auth/infrastructure/persistence/postgres/schemas';
 
 @Module({
   imports: [
@@ -52,6 +56,8 @@ import { PostgresAccountSchema } from './auth/infrastructure/persistence/postgre
           PostgresRoleSchema,
           PostgresPermissionSchema,
           PostgresRolePermissionSchema,
+          PostgresSessionSchema,
+          PostgresVerificationCodeSchema,
         ],
         synchronize: true,
         retryAttempts: 3,

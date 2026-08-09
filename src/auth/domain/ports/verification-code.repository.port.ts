@@ -1,7 +1,7 @@
 import { VerificationCode } from '../entities';
 
 export abstract class VerificationCodeRepositoryPort {
-  abstract findByCode(code: string): Promise<VerificationCode | null>;
+  abstract findByAccountId(accountId: string): Promise<VerificationCode | null>;
   abstract create(verificationCode: VerificationCode): Promise<void>;
   abstract updateCodeHash(
     verificationCodeId: string,
@@ -10,6 +10,8 @@ export abstract class VerificationCodeRepositoryPort {
   ): Promise<number>;
   abstract invalidateCode(
     verificationCodeId: string,
-    usedAt: string,
+    usedAt: Date,
   ): Promise<number>;
 }
+
+export const VERIFICATION_CODE_REPOSITORY = 'VERIFICATION_CODE_REPOSITORY';

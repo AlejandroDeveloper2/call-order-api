@@ -18,3 +18,5 @@ export abstract class AccountRepositoryPort {
     updateAccountMetaInput: UpdateAccountMetaInput,
   ): Promise<number>;
 }
+
+export const ACCOUNT_REPOSITORY = 'ACCOUNT_REPOSITORY';

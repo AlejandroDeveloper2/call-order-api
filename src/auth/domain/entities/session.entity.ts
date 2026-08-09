@@ -1,3 +1,5 @@
+import { Account } from './account.entity';
+
 export class Session {
   constructor(
     public readonly sessionId: string,
@@ -12,5 +14,6 @@ export class Session {
     public revokedAt?: Date,
     public deviceName?: string,
     public deviceType?: string,
+    public account?: Account,
   ) {}
 }
