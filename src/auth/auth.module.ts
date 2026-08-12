@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 /** Puertos */
 import {
@@ -7,6 +10,9 @@ import {
   SESSION_REPOSITORY,
   VERIFICATION_CODE_REPOSITORY,
 } from './domain/ports';
+
+/** Casos de uso */
+import { LoginUseCase } from './application/use-cases/login/login.usecase';
 
 /** Controladores */
 import { AuthController } from './infrastructure/controllers/auth.controller';
@@ -23,8 +29,29 @@ import {
   PostgresVerificationCodeRepository,
 } from './infrastructure/persistence/postgres/repositories';
 
+/** Módulos */
+import { UsersModule } from '../users/users.module';
+import { SharedModule } from '../shared/shared.module';
+
+/** Estrategias */
+import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
+
+/** Guards */
+import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
+
 @Module({
   imports: [
+    SharedModule,
+    PassportModule,
+    UsersModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET'),
+        signOptions: { expiresIn: '1d' },
+      }),
+      inject: [ConfigService],
+    }),
     TypeOrmModule.forFeature([
       PostgresAccountSchema,
       PostgresSessionSchema,
@@ -33,6 +60,9 @@ import {
   ],
   controllers: [AuthController],
   providers: [
+    JwtStrategy,
+    PermissionsGuard,
+    LoginUseCase,
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
     {
@@ -40,5 +70,6 @@ import {
       useClass: PostgresVerificationCodeRepository,
     },
   ],
+  exports: [PermissionsGuard],
 })
 export class AuthModule {}

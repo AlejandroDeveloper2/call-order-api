@@ -1,5 +1,7 @@
 import { Account } from '../../../../domain/entities';
 
+import { UserMapper } from '../../../../../users/infrastructure/persistence/postgres/mappers';
+
 import { PostgresAccountSchema } from '../schemas';
 
 export class AccountMapper {
@@ -9,9 +11,10 @@ export class AccountMapper {
       schema.email,
       schema.passwordHash,
       schema.mustChangePassword,
-      schema.lastLoginAt,
       schema.failedAttempts,
+      schema.lastLoginAt,
       schema.lockedUtil,
+      UserMapper.toDomain(schema.profile),
     );
   }
 

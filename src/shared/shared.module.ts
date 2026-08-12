@@ -7,14 +7,19 @@ import {
 } from './infrastructure/adapters';
 
 import { CloudinaryUploadInterceptor } from './infrastructure/interceptors';
+import { EMAIL_SENDER_KEY } from './domain/ports';
 
 @Module({
   imports: [ConfigModule],
   providers: [
-    NodeMailerAdapter,
+    { provide: EMAIL_SENDER_KEY, useClass: NodeMailerAdapter },
     CloudinaryAdpater,
     CloudinaryUploadInterceptor,
   ],
-  exports: [NodeMailerAdapter, CloudinaryAdpater, CloudinaryUploadInterceptor],
+  exports: [
+    { provide: EMAIL_SENDER_KEY, useClass: NodeMailerAdapter },
+    CloudinaryAdpater,
+    CloudinaryUploadInterceptor,
+  ],
 })
 export class SharedModule {}

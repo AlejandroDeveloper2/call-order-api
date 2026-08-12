@@ -31,6 +31,16 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
       return handleServerError(error);
     }
   }
+
+  async findByEmail(email: string): Promise<Account | null> {
+    try {
+      const account = await this.accountRepository.findOneBy({ email });
+      if (!account) return null;
+      return AccountMapper.toDomain(account);
+    } catch (error: unknown) {
+      return handleServerError(error);
+    }
+  }
   async create(account: Account): Promise<void> {
     try {
       const schema = AccountMapper.toPersistence(account);

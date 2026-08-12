@@ -17,7 +17,9 @@ export class PostgresUserSchema {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @OneToOne(() => PostgresAccountSchema, { onDelete: 'NO ACTION' })
+  @OneToOne(() => PostgresAccountSchema, (account) => account.profile, {
+    onDelete: 'NO ACTION',
+  })
   @JoinColumn({ name: 'accountId' })
   account!: PostgresAccountSchema;
 

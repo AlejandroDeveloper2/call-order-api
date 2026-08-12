@@ -57,5 +57,6 @@ import { SharedModule } from '../shared/shared.module';
     { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
     { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },
   ],
+  exports: [CreateUserUseCase, USER_REPOSITORY, PERMISSION_REPOSITORY],
 })
 export class UsersModule {}

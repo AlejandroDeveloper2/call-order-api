@@ -19,8 +19,8 @@ export class UserMapper {
             schema.account.email,
             schema.account.passwordHash,
             schema.account.mustChangePassword,
-            schema.account.lastLoginAt,
             schema.account.failedAttempts,
+            schema.account.lastLoginAt,
             schema.account.lockedUtil,
           )
         : undefined,

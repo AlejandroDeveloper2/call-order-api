@@ -12,8 +12,9 @@ import {
 import { UserQueryDto, UpdateUserStatusDto } from '../../application/dto';
 
 import { UsersController } from './users.controller';
+import { CloudinaryAdpater } from '../../../shared/infrastructure/adapters';
 
-import { SharedModule } from '../../../shared/shared.module';
+// SharedModule removed to keep unit test isolated from global providers
 
 jest.mock('uuid', () => ({
   v4: () => 'test-user-id',
@@ -89,9 +90,16 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [SharedModule],
       controllers: [UsersController],
       providers: [
+        {
+          provide: CloudinaryAdpater,
+          useValue: {
+            uploadFile: jest
+              .fn()
+              .mockResolvedValue({ secure_url: 'avatar-url' }),
+          },
+        },
         {
           provide: FindUserByAccountUseCase,
           useValue: mockFindUserByAccountUseCase,
@@ -120,6 +128,7 @@ describe('UsersController', () => {
       message: 'Perfil de usuario obtenido correctamente',
       httpCode: 200,
     });
+    expect(mockFindUserByAccountUseCase.run).toHaveBeenCalledWith(accountId);
   });
 
   it('deberia devolver un listado paginado de usuarios segun una query', async () => {
@@ -130,6 +139,7 @@ describe('UsersController', () => {
       message: 'Usuarios obtenidos correctamente',
       httpCode: 200,
     });
+    expect(mockFindUsersUseCase.run).toHaveBeenCalledWith(query);
   });
 
   it('deberia actualizar el perfil de un usuario que corresponde a un determinado id', async () => {
@@ -145,6 +155,10 @@ describe('UsersController', () => {
       message: 'Perfil de usuario actualizado correctamente',
       httpCode: 200,
     });
+    expect(mockUpdateProfileUseCase.run).toHaveBeenCalledWith(
+      profileId,
+      profileToUpdate,
+    );
   });
 
   it('deberia actualizar el estado de un perfil de usuario que corresponde a un determinado id', async () => {
@@ -159,6 +173,10 @@ describe('UsersController', () => {
       message: 'Estado del usuario actualizado correctamente',
       httpCode: 200,
     });
+    expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledWith(
+      profileId,
+      statusToUpdate1,
+    );
 
     await expect(
       controller.patchUserStatus(profileId, statusToUpdate2),
@@ -167,6 +185,10 @@ describe('UsersController', () => {
       message: 'Estado del usuario actualizado correctamente',
       httpCode: 200,
     });
+    expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledWith(
+      profileId,
+      statusToUpdate2,
+    );
   });
 
   it('deberia actualizar el avatar del usuario', async () => {
@@ -180,5 +202,9 @@ describe('UsersController', () => {
       message: 'Avatar actualizado correctamente',
       httpCode: 200,
     });
+    expect(mockUpdateUserAvatarUseCase.run).toHaveBeenCalledWith(
+      profileId,
+      avatarUrl,
+    );
   });
 });
