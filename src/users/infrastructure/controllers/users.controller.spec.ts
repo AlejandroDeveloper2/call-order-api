@@ -120,6 +120,10 @@ describe('UsersController', () => {
     controller = module.get<UsersController>(UsersController);
   });
 
+  it('Deberia estar definido el controlador de usuarios', () => {
+    expect(controller).toBeDefined();
+  });
+
   it('deberia devolver el perfil del usuario que coincida con el accountId', async () => {
     const accountId: string = 'test-account-id';
 
