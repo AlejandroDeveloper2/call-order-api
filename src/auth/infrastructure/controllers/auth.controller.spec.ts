@@ -2,10 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { AuthController } from './auth.controller';
 
-import { LoginUseCase } from '../../application/use-cases/login/login.usecase';
-import { ValidateIdentityUseCase } from '../../application/use-cases/validate-identity/validate-identity.usecase';
+import {
+  LoginUseCase,
+  ValidateIdentityUseCase,
+} from '../../application/use-cases';
 
-import { LoginDto } from '../../application/dto';
+import { LoginDto, ValidateIdentityDto } from '../../application/dto';
 
 jest.mock('uuid', () => ({
   v4: () => 'test-code-id',
@@ -22,12 +24,23 @@ describe('AuthController', () => {
     }),
   };
 
+  const mockValidateIdentityUseCase = {
+    run: jest.fn().mockResolvedValue({
+      data: { token: 'test-token', refreshToken: 'test-refresh-token' },
+      message: 'Identidad verificada con éxito',
+      httpCode: 200,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
         { provide: LoginUseCase, useValue: mockLoginUseCase },
-        { provide: ValidateIdentityUseCase, useValue: { run: jest.fn() } },
+        {
+          provide: ValidateIdentityUseCase,
+          useValue: mockValidateIdentityUseCase,
+        },
       ],
     }).compile();
 
@@ -50,5 +63,24 @@ describe('AuthController', () => {
       httpCode: 200,
     });
     expect(mockLoginUseCase.run).toHaveBeenCalledWith(loginDto);
+  });
+
+  it('deberia validar la identidad de un usuario que esta intentando loguearse y devolver el token y refresh token', async () => {
+    const validateIdentityDto: ValidateIdentityDto = {
+      verificationCode: '123456',
+      accountId: 'test-account-id',
+    };
+
+    await expect(
+      controller.postValidateAccount(validateIdentityDto),
+    ).resolves.toEqual({
+      data: { token: 'test-token', refreshToken: 'test-refresh-token' },
+      message: 'Identidad verificada con éxito',
+      httpCode: 200,
+    });
+
+    expect(mockValidateIdentityUseCase.run).toHaveBeenCalledWith(
+      validateIdentityDto,
+    );
   });
 });

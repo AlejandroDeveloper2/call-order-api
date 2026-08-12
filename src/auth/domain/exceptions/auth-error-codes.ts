@@ -7,4 +7,6 @@ export const AUTH_ERROR_CODES = {
   inactiveAccount: 'INACTIVE_ACCOUNT',
   loginLocked: 'LOGIN_LOCKED',
   invalidCode: 'INVALID_CODE',
+  codeNotFound: 'CODE_NOT_FOUND',
+  expiredCode: 'EXPIRED_CODE',
 };

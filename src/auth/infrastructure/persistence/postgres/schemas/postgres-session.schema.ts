@@ -28,17 +28,17 @@ export class PostgresSessionSchema {
   @Column()
   refreshTokenHash!: string;
 
-  @Column()
-  browser!: string;
+  @Column({ nullable: true })
+  browser?: string;
 
-  @Column()
-  operatingSystem!: string;
+  @Column({ nullable: true })
+  operatingSystem?: string;
 
-  @Column()
-  ipAddress!: string;
+  @Column({ nullable: true })
+  ipAddress?: string;
 
-  @Column()
-  userAgent!: string;
+  @Column({ nullable: true })
+  userAgent?: string;
 
   @Column({ type: 'date' })
   expiresAt!: Date;

@@ -9,8 +9,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { Session } from '../../../domain/entities';
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
   VERIFICATION_CODE_REPOSITORY,
@@ -27,8 +25,6 @@ import { ValidateIdentityDto } from '../../dto';
 export class ValidateIdentityUseCase {
   constructor(
     private readonly tokenService: JwtService,
-    @Inject(ACCOUNT_REPOSITORY)
-    private readonly accountRepository: AccountRepositoryPort,
     @Inject(VERIFICATION_CODE_REPOSITORY)
     private readonly verificationCodeRepository: VerificationCodeRepositoryPort,
     @Inject(SESSION_REPOSITORY)
@@ -58,7 +54,7 @@ export class ValidateIdentityUseCase {
     /** Validar si el código valido fue encontrado */
     if (!validCode)
       throw new AppError(
-        AUTH_ERROR_CODES.invalidCode,
+        AUTH_ERROR_CODES.codeNotFound,
         404,
         'Código de verificación de autenticación no encontrado',
         true,
@@ -76,7 +72,7 @@ export class ValidateIdentityUseCase {
     const today = new Date();
     if (isAfter(today, new Date(validCode.expiresAt)))
       throw new AppError(
-        AUTH_ERROR_CODES.invalidCode,
+        AUTH_ERROR_CODES.expiredCode,
         401,
         'Código de verificación de autenticación ha expirado',
         true,
@@ -108,12 +104,12 @@ export class ValidateIdentityUseCase {
       validCode.accountId,
       tokenHash,
       refreshTokenHash,
+      expiresAt,
+      lastActivityAt,
       validateAccountDto.browser || 'unknown',
       validateAccountDto.operatingSystem || 'unknown',
       validateAccountDto.ipAddress || '0.0.0.0',
       validateAccountDto.userAgent || '',
-      expiresAt,
-      lastActivityAt,
       undefined,
       validateAccountDto.deviceName,
       validateAccountDto.deviceType,
