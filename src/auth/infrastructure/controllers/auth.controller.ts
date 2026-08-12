@@ -1,18 +1,33 @@
 import { Body, Controller, Post } from '@nestjs/common';
 
-import { LoginUseCase } from '../../application/use-cases/login/login.usecase';
+/** Casos de uso */
+import {
+  LoginUseCase,
+  ValidateIdentityUseCase,
+} from '../../application/use-cases';
 
-import { LoginDto } from '../../application/dto';
+/** Dtos */
+import { LoginDto, ValidateIdentityDto } from '../../application/dto';
 
+/** Decoradores */
 import { ApiMessage } from '../../../shared/infrastructure/decorators';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly loginUseCase: LoginUseCase) {}
+  constructor(
+    private readonly loginUseCase: LoginUseCase,
+    private readonly validateAccountUseCase: ValidateIdentityUseCase,
+  ) {}
 
   @Post('/login')
-  @ApiMessage('Inicio de sesión correcto')
+  @ApiMessage('Credenciales verificadas correctamente')
   postLogin(@Body() loginDto: LoginDto) {
     return this.loginUseCase.run(loginDto);
+  }
+
+  @Post('/validate')
+  @ApiMessage('Identidad verificada con éxito')
+  postValidateAccount(@Body() validateIdentityDto: ValidateIdentityDto) {
+    return this.validateAccountUseCase.run(validateIdentityDto);
   }
 }

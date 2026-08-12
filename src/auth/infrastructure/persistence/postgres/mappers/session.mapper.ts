@@ -9,6 +9,7 @@ export class SessionMapper {
     return new Session(
       schema.id,
       schema.accountId,
+      schema.tokenHash,
       schema.refreshTokenHash,
       schema.browser,
       schema.operatingSystem,
@@ -27,6 +28,7 @@ export class SessionMapper {
     const schema = new PostgresSessionSchema();
     schema.id = domain.sessionId;
     schema.accountId = domain.accountId;
+    schema.tokenHash = domain.tokenHash;
     schema.refreshTokenHash = domain.refreshTokenHash;
     schema.browser = domain.browser;
     schema.operatingSystem = domain.operatingSystem;

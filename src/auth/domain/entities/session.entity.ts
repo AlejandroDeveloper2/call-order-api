@@ -4,6 +4,7 @@ export class Session {
   constructor(
     public readonly sessionId: string,
     public readonly accountId: string,
+    public tokenHash: string,
     public refreshTokenHash: string,
     public browser: string,
     public operatingSystem: string,

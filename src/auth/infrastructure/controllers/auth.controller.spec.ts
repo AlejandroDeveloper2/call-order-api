@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 
 import { LoginUseCase } from '../../application/use-cases/login/login.usecase';
+import { ValidateIdentityUseCase } from '../../application/use-cases/validate-identity/validate-identity.usecase';
+
 import { LoginDto } from '../../application/dto';
 
 jest.mock('uuid', () => ({
@@ -14,8 +16,8 @@ describe('AuthController', () => {
 
   const mockLoginUseCase = {
     run: jest.fn().mockResolvedValue({
-      data: null,
-      message: 'Inicio de sesión correcto',
+      data: 'test-account-id',
+      message: 'Credenciales verificadas correctamente',
       httpCode: 200,
     }),
   };
@@ -23,7 +25,10 @@ describe('AuthController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: LoginUseCase, useValue: mockLoginUseCase }],
+      providers: [
+        { provide: LoginUseCase, useValue: mockLoginUseCase },
+        { provide: ValidateIdentityUseCase, useValue: { run: jest.fn() } },
+      ],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
@@ -33,15 +38,15 @@ describe('AuthController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('deberia verificar las credenciales de un usuario y enviar un código de verificación al correo ingresado', async () => {
+  it('deberia verificar las credenciales de un usuario, enviar un código de verificación al correo ingresado y devolver el ID de la cuenta asociada', async () => {
     const loginDto: LoginDto = {
       email: 'alejo@gmail.com',
       password: 'Alejo123@',
     };
 
     await expect(controller.postLogin(loginDto)).resolves.toEqual({
-      data: null,
-      message: 'Inicio de sesión correcto',
+      data: 'test-account-id',
+      message: 'Credenciales verificadas correctamente',
       httpCode: 200,
     });
     expect(mockLoginUseCase.run).toHaveBeenCalledWith(loginDto);

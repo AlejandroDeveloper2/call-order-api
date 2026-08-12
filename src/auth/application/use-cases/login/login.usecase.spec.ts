@@ -180,7 +180,7 @@ describe('LoginUseCase', () => {
       verificationCodeRepository.create.mockResolvedValue(undefined);
       emailSenderAdapter.sendEmail.mockResolvedValue(undefined);
 
-      await expect(useCase.run(dto)).resolves.toBeUndefined();
+      await expect(useCase.run(dto)).resolves.toBe(account.accountId);
 
       expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
         failedAttempts: 0,
@@ -233,7 +233,7 @@ describe('LoginUseCase', () => {
       verificationCodeRepository.create.mockResolvedValue(undefined);
       emailSenderAdapter.sendEmail.mockResolvedValue(undefined);
 
-      await expect(useCase.run(dto)).resolves.toBeUndefined();
+      await expect(useCase.run(dto)).resolves.toBe(account.accountId);
 
       expect(generateVerificationCode).toHaveBeenCalledTimes(1);
       expect(verificationCodeRepository.create).toHaveBeenCalledWith(

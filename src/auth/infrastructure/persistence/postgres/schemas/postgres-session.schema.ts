@@ -23,6 +23,9 @@ export class PostgresSessionSchema {
   accountId!: string;
 
   @Column()
+  tokenHash!: string;
+
+  @Column()
   refreshTokenHash!: string;
 
   @Column()

@@ -20,13 +20,15 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
     @InjectRepository(PostgresVerificationCodeSchema)
     private readonly repository: Repository<PostgresVerificationCodeSchema>,
   ) {}
-  async findByAccountId(accountId: string): Promise<VerificationCode | null> {
+  async findByAccountId(accountId: string): Promise<VerificationCode[]> {
     try {
-      const verificationCode = await this.repository.findOneBy({
+      const verificationCodes = await this.repository.findBy({
         accountId,
+        usedAt: undefined,
       });
-      if (!verificationCode) return null;
-      return VerificationCodeMapper.toDomain(verificationCode);
+      return verificationCodes.map((schema) =>
+        VerificationCodeMapper.toDomain(schema),
+      );
     } catch (error: unknown) {
       return handleServerError(error);
     }

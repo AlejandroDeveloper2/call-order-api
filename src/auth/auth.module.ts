@@ -12,7 +12,7 @@ import {
 } from './domain/ports';
 
 /** Casos de uso */
-import { LoginUseCase } from './application/use-cases/login/login.usecase';
+import { LoginUseCase, ValidateIdentityUseCase } from './application/use-cases';
 
 /** Controladores */
 import { AuthController } from './infrastructure/controllers/auth.controller';
@@ -63,6 +63,7 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
     JwtStrategy,
     PermissionsGuard,
     LoginUseCase,
+    ValidateIdentityUseCase,
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
     {

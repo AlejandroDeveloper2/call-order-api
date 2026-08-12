@@ -33,7 +33,7 @@ export class LoginUseCase {
     private readonly emailSender: ports.EmailSenderPort,
   ) {}
 
-  async run(loginDto: LoginDto): Promise<void> {
+  async run(loginDto: LoginDto): Promise<string> {
     const account = await this.accountRepository.findByEmail(loginDto.email);
     if (!account)
       throw new AppError(
@@ -81,6 +81,8 @@ export class LoginUseCase {
     }
 
     await this.generateAndSendVerificationCode(account);
+
+    return account.accountId;
   }
 
   private isLockExpired(lockedUtil: Date): boolean {

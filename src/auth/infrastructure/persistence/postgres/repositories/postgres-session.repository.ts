@@ -87,4 +87,26 @@ export class PostgresSessionRepository implements SessionRepositoryPort {
       return handleServerError(error);
     }
   }
+  async revokeByAccountId(
+    accountId: string,
+    revokedAt: Date,
+    excludeSessionId?: string,
+  ): Promise<number> {
+    try {
+      const qb = this.sessionRepository
+        .createQueryBuilder()
+        .update()
+        .set({ revokedAt })
+        .where('accountId = :accountId', { accountId })
+        .andWhere('revokedAt IS NULL');
+
+      if (excludeSessionId)
+        qb.andWhere('id != :excludeId', { excludeId: excludeSessionId });
+
+      const result = await qb.execute();
+      return result.affected || 0;
+    } catch (error: unknown) {
+      return handleServerError(error);
+    }
+  }
 }
