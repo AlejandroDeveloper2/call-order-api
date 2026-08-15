@@ -1,10 +1,15 @@
+import { TransactionContext } from '../../../shared/domain/ports';
+
 import { Account } from '../entities';
 import { UpdateAccountMetaInput } from '../types';
 
 export abstract class AccountRepositoryPort {
   abstract findById(accountId: string): Promise<Account | null>;
   abstract findByEmail(email: string): Promise<Account | null>;
-  abstract create(account: Account): Promise<void>;
+  abstract create(
+    account: Account,
+    context?: TransactionContext,
+  ): Promise<void>;
   abstract updateEmail(
     accountId: string,
     updatedEmail: string,

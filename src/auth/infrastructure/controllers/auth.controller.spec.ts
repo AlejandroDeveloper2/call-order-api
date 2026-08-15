@@ -5,12 +5,17 @@ import { AuthController } from './auth.controller';
 import {
   LoginUseCase,
   ValidateIdentityUseCase,
+  CreateAccountUseCase,
 } from '../../application/use-cases';
 
-import { LoginDto, ValidateIdentityDto } from '../../application/dto';
+import {
+  LoginDto,
+  ValidateIdentityDto,
+  CreateAccountDto,
+} from '../../application/dto';
 
 jest.mock('uuid', () => ({
-  v4: () => 'test-code-id',
+  v4: () => 'test-account-id',
 }));
 
 describe('AuthController', () => {
@@ -32,6 +37,14 @@ describe('AuthController', () => {
     }),
   };
 
+  const mockCreateAccountUseCase = {
+    run: jest.fn().mockResolvedValue({
+      data: null,
+      message: 'Cuenta creada con éxito',
+      httpCode: 200,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -40,6 +53,10 @@ describe('AuthController', () => {
         {
           provide: ValidateIdentityUseCase,
           useValue: mockValidateIdentityUseCase,
+        },
+        {
+          provide: CreateAccountUseCase,
+          useValue: mockCreateAccountUseCase,
         },
       ],
     }).compile();
@@ -74,7 +91,10 @@ describe('AuthController', () => {
     await expect(
       controller.postValidateAccount(validateIdentityDto),
     ).resolves.toEqual({
-      data: { token: 'test-token', refreshToken: 'test-refresh-token' },
+      data: {
+        token: 'test-token',
+        refreshToken: 'test-refresh-token',
+      },
       message: 'Identidad verificada con éxito',
       httpCode: 200,
     });
@@ -82,5 +102,25 @@ describe('AuthController', () => {
     expect(mockValidateIdentityUseCase.run).toHaveBeenCalledWith(
       validateIdentityDto,
     );
+  });
+
+  it('deberia crear una nueva cuenta de usuario con email y contraseña', async () => {
+    const createAccountDto: CreateAccountDto = {
+      email: 'diego@gmail.com',
+      password: 'Diego123@',
+      fullname: 'Diego Diaz',
+      phone: '3105073199',
+      roleId: 'role-test-id',
+    };
+
+    await expect(
+      controller.postCreateAccount(createAccountDto),
+    ).resolves.toEqual({
+      data: null,
+      message: 'Cuenta creada con éxito',
+      httpCode: 200,
+    });
+
+    expect(mockCreateAccountUseCase.run).toHaveBeenCalledWith(createAccountDto);
   });
 });

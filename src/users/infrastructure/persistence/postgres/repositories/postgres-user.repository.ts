@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 
 /** Puertos */
 import { UserRepositoryPort } from '../../../../domain/ports';
 /** Entidades de dominio */
 import { User, UserSearchQuery } from '../../../../domain/entities';
+import { TransactionContext } from '../../../../../shared/domain/ports';
+/** Tipos de dominio */
 /** Tipos de dominio */
 import { UpdateUserInput } from '../../../../domain/types';
 import { PaginatedResponse } from '../../../../../shared/domain/types';
@@ -16,6 +18,8 @@ import { handleServerError } from '../../../../../shared/domain/utils/handleServ
 import { PostgresUserSchema } from '../schemas';
 /** Mapper */
 import { UserMapper } from '../mappers';
+/** Adaptadores */
+import { TypeOrmTransactionContext } from '../../../../../shared/infrastructure/adapters';
 
 @Injectable()
 export class PostgresUserRepository implements UserRepositoryPort {
@@ -23,6 +27,14 @@ export class PostgresUserRepository implements UserRepositoryPort {
     @InjectRepository(PostgresUserSchema)
     private readonly repository: Repository<PostgresUserSchema>,
   ) {}
+
+  private resolveManager(context?: TransactionContext): EntityManager {
+    if (context instanceof TypeOrmTransactionContext) {
+      return context.manager;
+    }
+
+    return this.repository.manager;
+  }
 
   async find(query: UserSearchQuery): Promise<PaginatedResponse<User>> {
     try {
@@ -77,10 +89,11 @@ export class PostgresUserRepository implements UserRepositoryPort {
       return handleServerError(e);
     }
   }
-  async create(user: User): Promise<void> {
+  async create(user: User, context?: TransactionContext): Promise<void> {
     try {
+      const manager = this.resolveManager(context);
       const schema = UserMapper.toPersistence(user);
-      await this.repository.save(schema);
+      await manager.save(schema);
     } catch (e: unknown) {
       return handleServerError(e);
     }

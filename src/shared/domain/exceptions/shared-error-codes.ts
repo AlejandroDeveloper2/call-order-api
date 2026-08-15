@@ -6,4 +6,5 @@ export const SHARED_ERROR_CODES = {
   notAuthenticated: 'NOT_AUTHENTICATED',
   imageUploadError: 'IMAGE_UPLOAD_ERROR',
   fileNotProvided: 'FILE_NOT_PROVIDED',
+  refreshNotProvided: 'REFRESH_NOT_PROVIDED',
 };

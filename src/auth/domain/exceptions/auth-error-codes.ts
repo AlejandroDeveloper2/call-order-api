@@ -9,4 +9,5 @@ export const AUTH_ERROR_CODES = {
   invalidCode: 'INVALID_CODE',
   codeNotFound: 'CODE_NOT_FOUND',
   expiredCode: 'EXPIRED_CODE',
+  accountAlreadyExists: 'ACCOUNT_ALREADY_EXISTS',
 };

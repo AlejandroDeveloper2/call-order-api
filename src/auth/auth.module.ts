@@ -12,7 +12,11 @@ import {
 } from './domain/ports';
 
 /** Casos de uso */
-import { LoginUseCase, ValidateIdentityUseCase } from './application/use-cases';
+import {
+  CreateAccountUseCase,
+  LoginUseCase,
+  ValidateIdentityUseCase,
+} from './application/use-cases';
 
 /** Controladores */
 import { AuthController } from './infrastructure/controllers/auth.controller';
@@ -64,6 +68,7 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
     PermissionsGuard,
     LoginUseCase,
     ValidateIdentityUseCase,
+    CreateAccountUseCase,
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
     {

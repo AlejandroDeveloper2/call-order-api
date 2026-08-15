@@ -29,6 +29,7 @@ import {
   UpdateUserStatusDto,
   UserQueryDto,
 } from '../../application/dto';
+import { Auth } from '../../../auth/infrastructure/decorators';
 
 @Controller('users')
 export class UsersController {
@@ -41,16 +42,19 @@ export class UsersController {
   ) {}
 
   @Get('/account')
+  @Auth('users:read:profile')
   @ApiMessage('Perfil de usuario obtenido correctamente')
   getByAccountId(@GetAccount('accountId', ParseUUIDPipe) accountId: string) {
     return this.findUserByAccountUseCase.run(accountId);
   }
   @Get('/')
+  @Auth('users:read:all')
   @ApiMessage('Usuarios obtenidos correctamente')
   getUsers(@Query() userQueryDto: UserQueryDto) {
     return this.findUsersUseCase.run(userQueryDto);
   }
   @Patch('/')
+  @Auth('users:update:profile')
   @ApiMessage('Perfil de usuario actualizado correctamente')
   patchProfile(
     @GetAccount('profileId', ParseUUIDPipe) profileId: string,
@@ -60,6 +64,7 @@ export class UsersController {
   }
 
   @Patch('/avatar')
+  @Auth('users:update:avatar')
   @ApiMessage('Avatar actualizado correctamente')
   @UploadAvatar()
   patchUserAvatar(
@@ -70,6 +75,7 @@ export class UsersController {
   }
 
   @Patch('/status')
+  @Auth('users:update:status')
   @ApiMessage('Estado del usuario actualizado correctamente')
   patchUserStatus(
     @GetAccount('profileId', ParseUUIDPipe) profileId: string,

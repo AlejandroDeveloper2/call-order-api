@@ -1,11 +1,12 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { Injectable } from '@nestjs/common';
 
 /** Entidades de Dominio */
 import { Account } from '../../../../domain/entities';
 /** Puertos */
 import { AccountRepositoryPort } from '../../../../domain/ports';
+import { TransactionContext } from '../../../../../shared/domain/ports';
 /** Tipos de dominio */
 import { UpdateAccountMetaInput } from '../../../../domain/types';
 /** Utilidades */
@@ -15,6 +16,8 @@ import { handleServerError } from '../../../../../shared/domain/utils/handleServ
 import { PostgresAccountSchema } from '../schemas';
 /** Mappers */
 import { AccountMapper } from '../mappers';
+/** Adaptadores */
+import { TypeOrmTransactionContext } from '../../../../../shared/infrastructure/adapters';
 
 @Injectable()
 export class PostgresAccountRepository implements AccountRepositoryPort {
@@ -22,6 +25,14 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
     @InjectRepository(PostgresAccountSchema)
     private readonly accountRepository: Repository<PostgresAccountSchema>,
   ) {}
+
+  private resolveManager(context?: TransactionContext): EntityManager {
+    if (context instanceof TypeOrmTransactionContext) {
+      return context.manager;
+    }
+
+    return this.accountRepository.manager;
+  }
   async findById(accountId: string): Promise<Account | null> {
     try {
       const account = await this.accountRepository.findOneBy({ id: accountId });
@@ -41,10 +52,11 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
       return handleServerError(error);
     }
   }
-  async create(account: Account): Promise<void> {
+  async create(account: Account, context?: TransactionContext): Promise<void> {
     try {
+      const manager = this.resolveManager(context);
       const schema = AccountMapper.toPersistence(account);
-      await this.accountRepository.save(schema);
+      await manager.save(schema);
     } catch (error: unknown) {
       return handleServerError(error);
     }
