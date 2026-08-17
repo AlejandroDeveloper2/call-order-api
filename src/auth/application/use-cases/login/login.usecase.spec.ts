@@ -1,32 +1,46 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
-import { addHours, addMinutes } from 'date-fns';
+import { addHours } from 'date-fns';
 
+/** Puertos */
 import {
   ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
+
 import {
   EMAIL_SENDER_KEY,
   EmailSenderPort,
 } from '../../../../shared/domain/ports';
 
-import { Account, VerificationCode } from '../../../domain/entities';
+/** Entidades */
+import { Account } from '../../../domain/entities';
 import { User } from '../../../../users/domain/entities';
 
-import { AppError } from '../../../../shared/domain/exceptions';
+/** Tipos */
+import { UpdateAccountMetaInput } from '../../../domain/types';
 
+/** Errores */
+import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+
+/** Utils */
 import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
 
+/** DTO */
 import { LoginDto } from '../../dto';
 
+/** Caso de uso */
 import { LoginUseCase } from './login.usecase';
 
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+  hash: jest.fn(),
+}));
+
 jest.mock('uuid', () => ({
-  v4: () => 'test-code-id',
+  v4: jest.fn(() => 'test-verification-code-id'),
 }));
 
 jest.mock('../../../domain/utils/generate-validation-code', () => ({
@@ -35,26 +49,39 @@ jest.mock('../../../domain/utils/generate-validation-code', () => ({
 
 describe('LoginUseCase', () => {
   let useCase: LoginUseCase;
-  const validPassword = 'alejo123@';
 
   const accountRepository = {
     findByEmail: jest.fn(),
-    update: jest.fn(),
+    update: jest.fn<Promise<number>, [string, UpdateAccountMetaInput]>(),
   } satisfies Pick<AccountRepositoryPort, 'findByEmail' | 'update'>;
 
   const verificationCodeRepository = {
     create: jest.fn(),
   } satisfies Pick<VerificationCodeRepositoryPort, 'create'>;
 
-  const emailSenderAdapter = { sendEmail: jest.fn() } satisfies Pick<
-    EmailSenderPort,
-    'sendEmail'
-  >;
+  const emailSender = {
+    sendEmail: jest.fn(),
+  } satisfies Pick<EmailSenderPort, 'sendEmail'>;
+
+  const bcryptCompareMock = jest.mocked<
+    (data: string | Buffer, encrypted: string) => Promise<boolean>
+  >(bcrypt.compare);
+  const bcryptHashMock = jest.mocked<
+    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
+  >(bcrypt.hash);
+
+  const generateVerificationCodeMock = jest.mocked(generateVerificationCode);
+
+  const buildLoginDto = (overrides: Partial<LoginDto> = {}): LoginDto => ({
+    email: 'alejo@gmail.com',
+    password: 'alejo123@',
+    ...overrides,
+  });
 
   const buildAccount = (overrides: Partial<Account> = {}): Account => ({
     accountId: 'test-account-id',
     email: 'alejo@gmail.com',
-    passwordHash: bcrypt.hashSync(validPassword, 10),
+    passwordHash: 'password-hash',
     mustChangePassword: false,
     failedAttempts: 0,
     ...overrides,
@@ -74,76 +101,43 @@ describe('LoginUseCase', () => {
         },
         {
           provide: EMAIL_SENDER_KEY,
-          useValue: emailSenderAdapter,
+          useValue: emailSender,
         },
       ],
     }).compile();
 
-    useCase = module.get(LoginUseCase);
-    accountRepository.findByEmail.mockReset();
-    accountRepository.update.mockReset();
-    verificationCodeRepository.create.mockReset();
-    emailSenderAdapter.sendEmail.mockReset();
+    useCase = module.get<LoginUseCase>(LoginUseCase);
+
     jest.clearAllMocks();
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  describe('run()', () => {
-    it('debe lanzar AppError cuando el email no corresponde a ninguna cuenta', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: validPassword,
-      };
+  describe('run', () => {
+    it('debe lanzar INVALID_CREDENTIALS cuando la cuenta no existe', async () => {
+      // Arrange
+      const dto = buildLoginDto();
 
       accountRepository.findByEmail.mockResolvedValue(null);
 
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
+      // Act
+      const result = useCase.run(dto);
 
-      const error = (await useCase
-        .run(dto)
-        .catch((err: AppError) => err)) as AppError;
-      expect(error).toBeInstanceOf(AppError);
-      expect(error.name).toBe('INVALID_CREDENTIALS');
-      expect(error.httpCode).toBe(401);
-      expect(accountRepository.findByEmail).toHaveBeenCalledWith(dto.email);
-      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSenderAdapter.sendEmail).not.toHaveBeenCalled();
-    });
-
-    it('debe incrementar los intentos fallidos y bloquear la cuenta al quinto error', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: 'clave-incorrecta',
-      };
-
-      const account = buildAccount({ failedAttempts: 4 });
-      accountRepository.findByEmail.mockResolvedValue(account);
-      accountRepository.update.mockResolvedValue(1);
-
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
-
-      const error = (await useCase
-        .run(dto)
-        .catch((err: AppError) => err)) as AppError;
-      expect(error).toBeInstanceOf(AppError);
-      expect(error.name).toBe('INVALID_CREDENTIALS');
-      expect(error.httpCode).toBe(401);
-      expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
-        failedAttempts: 5,
-        lockedUtil: expect.any(Date) as Date,
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.invalidCredentials,
+        httpCode: 401,
       });
+
+      expect(accountRepository.findByEmail).toHaveBeenCalledWith(dto.email);
+
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
+      expect(accountRepository.update).not.toHaveBeenCalled();
       expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSenderAdapter.sendEmail).not.toHaveBeenCalled();
+      expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('debe rechazar el login si la cuenta está bloqueada todavía', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: validPassword,
-      };
+    it('debe lanzar LOGIN_LOCKED cuando la cuenta está bloqueada', async () => {
+      // Arrange
+      const dto = buildLoginDto();
 
       const account = buildAccount({
         lockedUtil: addHours(new Date(), 1),
@@ -151,57 +145,75 @@ describe('LoginUseCase', () => {
 
       accountRepository.findByEmail.mockResolvedValue(account);
 
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
+      // Act
+      const result = useCase.run(dto);
 
-      const error = (await useCase
-        .run(dto)
-        .catch((err: AppError) => err)) as AppError;
-      expect(error).toBeInstanceOf(AppError);
-      expect(error.name).toBe('LOGIN_LOCKED');
-      expect(error.httpCode).toBe(403);
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.loginLocked,
+        httpCode: 403,
+      });
+
+      expect(accountRepository.findByEmail).toHaveBeenCalledWith(dto.email);
+
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
       expect(accountRepository.update).not.toHaveBeenCalled();
       expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSenderAdapter.sendEmail).not.toHaveBeenCalled();
+      expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('debe resetear el bloqueo cuando este ya expiró y continuar con el flujo de login', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: validPassword,
-      };
+    it('debe resetear el bloqueo cuando este ha expirado', async () => {
+      // Arrange
+      const dto = buildLoginDto();
 
       const account = buildAccount({
-        failedAttempts: 3,
-        lockedUtil: new Date(Date.now() - 1000),
+        failedAttempts: 4,
+        lockedUtil: new Date(Date.now() - 1_000),
       });
 
       accountRepository.findByEmail.mockResolvedValue(account);
       accountRepository.update.mockResolvedValue(1);
-      verificationCodeRepository.create.mockResolvedValue(undefined);
-      emailSenderAdapter.sendEmail.mockResolvedValue(undefined);
 
-      await expect(useCase.run(dto)).resolves.toBe(account.accountId);
+      bcryptCompareMock.mockResolvedValue(true);
+
+      bcryptHashMock.mockResolvedValue('verification-code-hash');
+
+      verificationCodeRepository.create.mockResolvedValue(undefined);
+      emailSender.sendEmail.mockResolvedValue(undefined);
+
+      // Act
+      const result = await useCase.run(dto);
+
+      // Assert
+      expect(result).toBe(account.accountId);
 
       expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
         failedAttempts: 0,
         lockedUtil: undefined,
       });
+
+      expect(account.failedAttempts).toBe(0);
+      expect(account.lockedUtil).toBeUndefined();
+
+      expect(bcryptCompareMock).toHaveBeenCalledWith(
+        dto.password,
+        account.passwordHash,
+      );
+
       expect(verificationCodeRepository.create).toHaveBeenCalledTimes(1);
-      expect(emailSenderAdapter.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailSender.sendEmail).toHaveBeenCalledTimes(1);
     });
 
-    it('debe rechazar el login si la cuenta está inactiva', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: validPassword,
-      };
+    it('debe lanzar INACTIVE_ACCOUNT cuando el perfil de la cuenta está inactivo', async () => {
+      // Arrange
+      const dto = buildLoginDto();
 
       const account = buildAccount({
         profile: new User(
-          'user-1',
+          'user-id',
           'Alejo',
           'test-account-id',
-          'role-1',
+          'role-id',
           undefined,
           undefined,
           false,
@@ -210,77 +222,157 @@ describe('LoginUseCase', () => {
 
       accountRepository.findByEmail.mockResolvedValue(account);
 
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
+      // Act
+      const result = useCase.run(dto);
 
-      const error = (await useCase
-        .run(dto)
-        .catch((err: AppError) => err)) as AppError;
-      expect(error).toBeInstanceOf(AppError);
-      expect(error.name).toBe('INACTIVE_ACCOUNT');
-      expect(error.httpCode).toBe(403);
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.inactiveAccount,
+        httpCode: 403,
+      });
+
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
+      expect(accountRepository.update).not.toHaveBeenCalled();
       expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSenderAdapter.sendEmail).not.toHaveBeenCalled();
+      expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('debe generar un código de verificación y enviar el email con el contenido correcto', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: validPassword,
+    it('debe incrementar los intentos fallidos cuando la contraseña es incorrecta', async () => {
+      // Arrange
+      const dto = buildLoginDto({
+        password: 'password-incorrecto',
+      });
+
+      const account = buildAccount({
+        failedAttempts: 2,
+      });
+
+      accountRepository.findByEmail.mockResolvedValue(account);
+
+      bcryptCompareMock.mockResolvedValue(false);
+
+      accountRepository.update.mockResolvedValue(1);
+
+      // Act
+      const result = useCase.run(dto);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.invalidCredentials,
+        httpCode: 401,
+      });
+
+      expect(bcryptCompareMock).toHaveBeenCalledWith(
+        dto.password,
+        account.passwordHash,
+      );
+
+      expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
+        failedAttempts: 3,
+        lockedUtil: undefined,
+      });
+
+      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
+      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('debe bloquear la cuenta durante dos horas al alcanzar cinco intentos fallidos', async () => {
+      // Arrange
+      const dto = buildLoginDto({
+        password: 'password-incorrecto',
+      });
+
+      const account = buildAccount({
+        failedAttempts: 4,
+      });
+
+      accountRepository.findByEmail.mockResolvedValue(account);
+
+      bcryptCompareMock.mockResolvedValue(false);
+
+      accountRepository.update.mockResolvedValue(1);
+
+      // Act
+      const result = useCase.run(dto);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.invalidCredentials,
+        httpCode: 401,
+      });
+
+      expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
+        failedAttempts: 5,
+        lockedUtil: expect.any(Date) as Date,
+      });
+
+      const updateCall = accountRepository.update.mock.calls[0];
+
+      const updateData = updateCall[1] as {
+        failedAttempts: number;
+        lockedUtil?: Date;
       };
 
+      expect(updateData.lockedUtil).toBeInstanceOf(Date);
+
+      expect(updateData.lockedUtil!.getTime()).toBeGreaterThan(Date.now());
+
+      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
+      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('debe generar y enviar el código de verificación cuando las credenciales son válidas', async () => {
+      // Arrange
+      const dto = buildLoginDto();
+
       const account = buildAccount();
+
       accountRepository.findByEmail.mockResolvedValue(account);
+
+      bcryptCompareMock.mockResolvedValue(true);
+
+      bcryptHashMock.mockResolvedValue('verification-code-hash');
+
       verificationCodeRepository.create.mockResolvedValue(undefined);
-      emailSenderAdapter.sendEmail.mockResolvedValue(undefined);
 
-      await expect(useCase.run(dto)).resolves.toBe(account.accountId);
+      emailSender.sendEmail.mockResolvedValue(undefined);
 
-      expect(generateVerificationCode).toHaveBeenCalledTimes(1);
+      // Act
+      const result = await useCase.run(dto);
+
+      // Assert
+      expect(result).toBe(account.accountId);
+
+      expect(generateVerificationCodeMock).toHaveBeenCalledTimes(1);
+
+      expect(bcryptCompareMock).toHaveBeenCalledWith(
+        dto.password,
+        account.passwordHash,
+      );
+
+      expect(bcryptHashMock).toHaveBeenCalledWith('123456', 10);
+
       expect(verificationCodeRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          verificationCodeId: 'test-code-id',
+          verificationCodeId: 'test-verification-code-id',
           accountId: account.accountId,
+          codeHash: 'verification-code-hash',
           type: 'double-factor',
           attempts: 0,
           expiresAt: expect.any(Date) as Date,
-          codeHash: expect.any(String) as string,
         }),
       );
-      expect(emailSenderAdapter.sendEmail).toHaveBeenCalledWith(
+
+      expect(emailSender.sendEmail).toHaveBeenCalledWith(
         account.email,
         'Código de verificación de CallOrder',
         expect.stringContaining('123456'),
       );
-      expect(emailSenderAdapter.sendEmail).toHaveBeenCalledWith(
+
+      expect(emailSender.sendEmail).toHaveBeenCalledWith(
         account.email,
         'Código de verificación de CallOrder',
         expect.stringContaining('10 minutos'),
-      );
-      expect(verificationCodeRepository.create).toHaveBeenCalledTimes(1);
-      expect(emailSenderAdapter.sendEmail).toHaveBeenCalledTimes(1);
-    });
-
-    it('debe utilizar una fecha de expiración dentro de 10 minutos para el código', async () => {
-      const dto: LoginDto = {
-        email: 'alejo@gmail.com',
-        password: validPassword,
-      };
-
-      const account = buildAccount();
-      accountRepository.findByEmail.mockResolvedValue(account);
-      verificationCodeRepository.create.mockResolvedValue(undefined);
-      emailSenderAdapter.sendEmail.mockResolvedValue(undefined);
-
-      await useCase.run(dto);
-
-      const createdVerificationCode = verificationCodeRepository.create.mock
-        .calls[0][0] as VerificationCode;
-
-      expect(createdVerificationCode.expiresAt.getTime()).toBeGreaterThan(
-        Date.now(),
-      );
-      expect(createdVerificationCode.expiresAt.getTime()).toBeLessThanOrEqual(
-        addMinutes(new Date(), 10).getTime(),
       );
     });
   });

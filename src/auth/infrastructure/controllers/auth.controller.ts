@@ -4,6 +4,7 @@ import { Body, Controller, Post } from '@nestjs/common';
 import {
   CreateAccountUseCase,
   LoginUseCase,
+  ResendCodeUseCase,
   ValidateIdentityUseCase,
 } from '../../application/use-cases';
 
@@ -11,6 +12,7 @@ import {
 import {
   CreateAccountDto,
   LoginDto,
+  ResendCodeDto,
   ValidateIdentityDto,
 } from '../../application/dto';
 
@@ -24,6 +26,7 @@ export class AuthController {
     private readonly loginUseCase: LoginUseCase,
     private readonly validateAccountUseCase: ValidateIdentityUseCase,
     private readonly createAccountUseCase: CreateAccountUseCase,
+    private readonly resendCodeUseCase: ResendCodeUseCase,
   ) {}
 
   @Post('/login')
@@ -43,5 +46,10 @@ export class AuthController {
   @ApiMessage('Cuenta creada con éxito')
   postCreateAccount(@Body() createAccountDto: CreateAccountDto) {
     return this.createAccountUseCase.run(createAccountDto);
+  }
+  @Post('/resend/code')
+  @ApiMessage('Código reenviado con éxito')
+  postResendCode(@Body() resendCodeDto: ResendCodeDto) {
+    return this.resendCodeUseCase.run(resendCodeDto);
   }
 }

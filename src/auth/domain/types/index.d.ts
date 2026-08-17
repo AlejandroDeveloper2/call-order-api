@@ -6,4 +6,10 @@ interface UpdateAccountMetaInput {
   lockedUtil?: Date;
 }
 
-export { VerificationCodeType, UpdateAccountMetaInput };
+interface UpdateCodeMetaInput {
+  attempts: number;
+  codeHash: string;
+  expiresAt: Date;
+}
+
+export { VerificationCodeType, UpdateAccountMetaInput, UpdateCodeMetaInput };

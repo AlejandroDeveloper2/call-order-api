@@ -51,16 +51,7 @@ export class ValidateIdentityUseCase {
 
     const validCode = results.find((r) => r.isValid);
 
-    /** Validar si el código valido fue encontrado */
     if (!validCode)
-      throw new AppError(
-        AUTH_ERROR_CODES.codeNotFound,
-        404,
-        'Código de verificación de autenticación no encontrado',
-        true,
-      );
-
-    if (!validCode.isValid)
       throw new AppError(
         AUTH_ERROR_CODES.invalidCode,
         401,

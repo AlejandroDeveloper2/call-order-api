@@ -13,6 +13,7 @@ import { handleServerError } from '../../../../../shared/domain/utils/handleServ
 import { PostgresVerificationCodeSchema } from '../schemas';
 /** Mappers */
 import { VerificationCodeMapper } from '../mappers';
+import { UpdateCodeMetaInput } from '../../../../domain/types';
 
 @Injectable()
 export class PostgresVerificationCodeRepository implements VerificationCodeRepositoryPort {
@@ -43,13 +44,13 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
   }
   async updateCodeHash(
     verificationCodeId: string,
-    attempts: number,
-    codeHash: string,
+    updateCodeMetaInput: UpdateCodeMetaInput,
   ): Promise<number> {
     try {
+      const { attempts, codeHash, expiresAt } = updateCodeMetaInput;
       const result = await this.repository.update(
         { id: verificationCodeId },
-        { attempts, codeHash },
+        { attempts, codeHash, expiresAt },
       );
       return result.affected || 0;
     } catch (error: unknown) {

@@ -5,6 +5,7 @@ import { addMinutes } from 'date-fns';
 
 /** Entidades de dominio */
 import { VerificationCode } from '../../../domain/entities';
+
 /** Puertos */
 import {
   SESSION_REPOSITORY,
@@ -12,27 +13,38 @@ import {
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
-/** Errores de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
 
-/** Casos de uso */
+/** Errores */
+import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+
+/** Caso de uso */
 import { ValidateIdentityUseCase } from './validate-identity.usecase';
-/** Dtos */
+
+/** DTO */
 import { ValidateIdentityDto } from '../../dto';
 
 jest.mock('uuid', () => ({
-  v4: () => 'test-session-id',
+  v4: jest.fn(() => 'test-session-id'),
 }));
 
-describe('ValidateIdentity', () => {
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+  hash: jest.fn(),
+}));
+
+describe('ValidateIdentityUseCase', () => {
   let useCase: ValidateIdentityUseCase;
+
+  const jwtService = {
+    sign: jest.fn(),
+  } satisfies Pick<JwtService, 'sign'>;
 
   const verificationCodeRepository = {
     findByAccountId: jest.fn(),
     invalidateCode: jest.fn(),
   } satisfies Pick<
     VerificationCodeRepositoryPort,
-    'invalidateCode' | 'findByAccountId'
+    'findByAccountId' | 'invalidateCode'
   >;
 
   const sessionRepository = {
@@ -40,27 +52,46 @@ describe('ValidateIdentity', () => {
     create: jest.fn(),
   } satisfies Pick<SessionRepositoryPort, 'revokeByAccountId' | 'create'>;
 
-  const buildVerificationCode = (overrides: Partial<VerificationCode> = {}) => {
-    const code = new VerificationCode(
-      'test-code-id',
-      'test-account-id',
-      bcrypt.hashSync('123456', 10),
+  const bcryptCompareMock = jest.mocked<
+    (data: string | Buffer, encrypted: string) => Promise<boolean>
+  >(bcrypt.compare);
+  const bcryptHashMock = jest.mocked<
+    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
+  >(bcrypt.hash);
+
+  const buildDto = (
+    overrides: Partial<ValidateIdentityDto> = {},
+  ): ValidateIdentityDto => ({
+    accountId: 'account-id',
+    verificationCode: '123456',
+    ...overrides,
+  });
+
+  const buildVerificationCode = (
+    overrides: Partial<VerificationCode> = {},
+  ): VerificationCode => {
+    const verificationCode = new VerificationCode(
+      'verification-code-id',
+      'account-id',
+      'code-hash',
       'double-factor',
       addMinutes(new Date(), 10),
       0,
     );
-    Object.assign(code, overrides);
-    return code;
+
+    Object.assign(verificationCode, overrides);
+
+    return verificationCode;
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        ValidateIdentityUseCase,
         {
           provide: JwtService,
-          useValue: { sign: jest.fn().mockReturnValue('signed-token') },
+          useValue: jwtService,
         },
-        ValidateIdentityUseCase,
         {
           provide: VERIFICATION_CODE_REPOSITORY,
           useValue: verificationCodeRepository,
@@ -72,129 +103,142 @@ describe('ValidateIdentity', () => {
       ],
     }).compile();
 
-    useCase = module.get(ValidateIdentityUseCase);
-    verificationCodeRepository.findByAccountId.mockReset();
-    verificationCodeRepository.invalidateCode.mockReset();
-    sessionRepository.create.mockReset();
-    sessionRepository.revokeByAccountId.mockReset();
+    useCase = module.get<ValidateIdentityUseCase>(ValidateIdentityUseCase);
+
     jest.clearAllMocks();
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  describe('run', () => {
+    it('debe lanzar AppError cuando el código ingresado no es válido', async () => {
+      // Arrange
+      const dto = buildDto();
 
-  describe('run()', () => {
-    it('debe lanzar un error cuando el código de verificación no es encontrado', async () => {
-      const dto: ValidateIdentityDto = {
-        verificationCode: '123456',
-        accountId: 'test-account-id',
-      };
+      const verificationCode = buildVerificationCode();
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([]);
+      verificationCodeRepository.findByAccountId.mockResolvedValue([
+        verificationCode,
+      ]);
 
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
+      bcryptCompareMock.mockResolvedValue(false);
 
-      const error = (await useCase
-        .run(dto)
-        .catch((err: AppError) => err)) as AppError;
-      expect(error).toBeInstanceOf(AppError);
-      expect(error.name).toBe('CODE_NOT_FOUND');
-      expect(error.httpCode).toBe(404);
+      // Act
+      const result = useCase.run(dto);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.invalidCode,
+        httpCode: 401,
+      });
+
       expect(verificationCodeRepository.findByAccountId).toHaveBeenCalledWith(
         dto.accountId,
       );
+
       expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
       expect(sessionRepository.create).not.toHaveBeenCalled();
       expect(verificationCodeRepository.invalidateCode).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar un error cuando el código ingresado no coincide con ninguno', async () => {
-      const dto: ValidateIdentityDto = {
-        verificationCode: '123456',
-        accountId: 'test-account-id',
-      };
+    it('debe lanzar AppError cuando el código ha expirado', async () => {
+      // Arrange
+      const dto = buildDto();
 
-      // Repository returns a code but with a different hash
-      const wrongHashCode = new VerificationCode(
-        'wrong-code-id',
-        dto.accountId,
-        bcrypt.hashSync('000000', 10),
-        'double-factor',
-        addMinutes(new Date(), 10),
-        0,
-      );
-
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        wrongHashCode,
-      ]);
-
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
-      const error = (await useCase
-        .run(dto)
-        .catch((e: AppError) => e)) as AppError;
-      expect(error.name).toBe('CODE_NOT_FOUND');
-      expect(verificationCodeRepository.findByAccountId).toHaveBeenCalledWith(
-        dto.accountId,
-      );
-    });
-
-    it('debe lanzar un error cuando el código ha expirado', async () => {
-      const dto: ValidateIdentityDto = {
-        verificationCode: '123456',
-        accountId: 'test-account-id',
-      };
-
-      const expiredCode = buildVerificationCode({
+      const expiredVerificationCode = buildVerificationCode({
         expiresAt: addMinutes(new Date(), -5),
       });
+
       verificationCodeRepository.findByAccountId.mockResolvedValue([
-        expiredCode,
+        expiredVerificationCode,
       ]);
 
-      await expect(useCase.run(dto)).rejects.toBeInstanceOf(AppError);
-      const error = (await useCase
-        .run(dto)
-        .catch((err: AppError) => err)) as AppError;
-      expect(error.name).toBe('EXPIRED_CODE');
-      expect(error.httpCode).toBe(401);
+      bcryptCompareMock.mockResolvedValue(true);
+
+      // Act
+      const result = useCase.run(dto);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.expiredCode,
+        httpCode: 401,
+      });
+
+      expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
+      expect(sessionRepository.create).not.toHaveBeenCalled();
+      expect(verificationCodeRepository.invalidateCode).not.toHaveBeenCalled();
     });
 
-    it('debe crear sesión nueva y devolver tokens en caso exitoso', async () => {
-      const dto: ValidateIdentityDto = {
-        verificationCode: '123456',
-        accountId: 'test-account-id',
+    it('debe crear una nueva sesión, invalidar el código y retornar los tokens cuando la identidad es válida', async () => {
+      // Arrange
+      const dto = buildDto({
         browser: 'Chrome',
         operatingSystem: 'Windows',
         ipAddress: '127.0.0.1',
-        userAgent: 'agent',
+        userAgent: 'Mozilla/5.0',
         deviceName: 'PC',
         deviceType: 'desktop',
-      };
-
-      const validCode = buildVerificationCode({
-        verificationCodeId: 'test-code-id',
-        accountId: dto.accountId,
-        expiresAt: addMinutes(new Date(), 10),
       });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([validCode]);
-      sessionRepository.revokeByAccountId.mockResolvedValue(1);
+      const validVerificationCode = buildVerificationCode({
+        verificationCodeId: 'verification-code-id',
+        accountId: dto.accountId,
+      });
+
+      verificationCodeRepository.findByAccountId.mockResolvedValue([
+        validVerificationCode,
+      ]);
+
+      bcryptCompareMock.mockResolvedValue(true);
+
+      jwtService.sign.mockReturnValue('access-token');
+
+      bcryptHashMock
+        .mockResolvedValueOnce('access-token-hash')
+        .mockResolvedValueOnce('refresh-token-hash');
+
+      sessionRepository.revokeByAccountId.mockResolvedValue(undefined);
       sessionRepository.create.mockResolvedValue(undefined);
       verificationCodeRepository.invalidateCode.mockResolvedValue(undefined);
 
+      // Act
       const result = await useCase.run(dto);
 
-      expect(result).toHaveProperty('token');
-      expect(result).toHaveProperty('refreshToken');
+      // Assert
+      expect(result.token).toBe('access-token');
+      expect(result.refreshToken).toEqual(expect.any(String));
+      expect(result.refreshToken).toHaveLength(128);
+
+      expect(jwtService.sign).toHaveBeenCalledTimes(1);
+
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        accountId: validVerificationCode.accountId,
+        roleId: undefined,
+        profileId: undefined,
+      });
+
+      expect(bcrypt.hash).toHaveBeenCalledTimes(2);
+
       expect(sessionRepository.revokeByAccountId).toHaveBeenCalledWith(
         dto.accountId,
         expect.any(Date),
       );
-      expect(sessionRepository.create).toHaveBeenCalled();
+
+      expect(sessionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'test-session-id',
+          accountId: dto.accountId,
+          tokenHash: 'access-token-hash',
+          refreshTokenHash: 'refresh-token-hash',
+          browser: dto.browser,
+          operatingSystem: dto.operatingSystem,
+          ipAddress: dto.ipAddress,
+          userAgent: dto.userAgent,
+          deviceName: dto.deviceName,
+          deviceType: dto.deviceType,
+        }),
+      );
 
       expect(verificationCodeRepository.invalidateCode).toHaveBeenCalledWith(
-        validCode.verificationCodeId,
+        validVerificationCode.verificationCodeId,
         expect.any(Date),
       );
     });

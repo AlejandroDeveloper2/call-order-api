@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,7 +24,6 @@ import {
 } from '../../../../shared/domain/ports';
 
 /** Errores */
-// import { AppError } from '../../../../shared/domain/exceptions';
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 /** Use case */
@@ -44,12 +41,12 @@ describe('CreateAccountUseCase', () => {
   let useCase: CreateAccountUseCase;
 
   const mockAccountRepository = {
-    findByEmail: jest.fn(),
-    create: jest.fn(),
+    findByEmail: jest.fn<Promise<Account | null>, [string]>(),
+    create: jest.fn<Promise<void>, [Account, object]>(),
   } satisfies Pick<AccountRepositoryPort, 'findByEmail' | 'create'>;
 
   const mockUserRepository = {
-    create: jest.fn(),
+    create: jest.fn<Promise<void>, [User, object]>(),
   } satisfies Pick<UserRepositoryPort, 'create'>;
 
   const mockTransactionManager = {
@@ -161,8 +158,7 @@ describe('CreateAccountUseCase', () => {
 
       await useCase.run(createAccountDto);
 
-      const createdAccount = mockAccountRepository.create.mock
-        .calls[0][0] as Account;
+      const createdAccount = mockAccountRepository.create.mock.calls[0][0];
 
       expect(createdAccount.accountId).toBe(accountId);
       expect(createdAccount.email).toBe(createAccountDto.email);
@@ -176,7 +172,7 @@ describe('CreateAccountUseCase', () => {
 
       await useCase.run(createAccountDto);
 
-      const createdUser = mockUserRepository.create.mock.calls[0][0] as User;
+      const createdUser = mockUserRepository.create.mock.calls[0][0];
 
       expect(createdUser.userId).toBe(userId);
       expect(createdUser.fullname).toBe(createAccountDto.fullname);
@@ -190,10 +186,9 @@ describe('CreateAccountUseCase', () => {
 
       await useCase.run(createAccountDto);
 
-      const createdAccount = mockAccountRepository.create.mock
-        .calls[0][0] as Account;
+      const createdAccount = mockAccountRepository.create.mock.calls[0][0];
 
-      const createdUser = mockUserRepository.create.mock.calls[0][0] as User;
+      const createdUser = mockUserRepository.create.mock.calls[0][0];
 
       expect(createdUser.accountId).toBe(createdAccount.accountId);
     });
@@ -205,8 +200,7 @@ describe('CreateAccountUseCase', () => {
 
       expect(bcrypt.hash).toHaveBeenCalledWith(createAccountDto.password, 10);
 
-      const createdAccount = mockAccountRepository.create.mock
-        .calls[0][0] as Account;
+      const createdAccount = mockAccountRepository.create.mock.calls[0][0];
 
       expect(createdAccount.passwordHash).toBe('hashed-password');
     });

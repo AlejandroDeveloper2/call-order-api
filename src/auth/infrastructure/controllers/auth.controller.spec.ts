@@ -1,126 +1,173 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
+/** Controller */
 import { AuthController } from './auth.controller';
 
+/** Use cases */
 import {
-  LoginUseCase,
-  ValidateIdentityUseCase,
   CreateAccountUseCase,
+  LoginUseCase,
+  ResendCodeUseCase,
+  ValidateIdentityUseCase,
 } from '../../application/use-cases';
 
+/** DTOs */
 import {
-  LoginDto,
-  ValidateIdentityDto,
   CreateAccountDto,
+  LoginDto,
+  ResendCodeDto,
+  ValidateIdentityDto,
 } from '../../application/dto';
 
 jest.mock('uuid', () => ({
-  v4: () => 'test-account-id',
+  v4: jest.fn(() => 'test-verification-code-id'),
 }));
 
 describe('AuthController', () => {
   let controller: AuthController;
 
-  const mockLoginUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: 'test-account-id',
-      message: 'Credenciales verificadas correctamente',
-      httpCode: 200,
-    }),
-  };
+  const loginUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<LoginUseCase, 'run'>;
 
-  const mockValidateIdentityUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: { token: 'test-token', refreshToken: 'test-refresh-token' },
-      message: 'Identidad verificada con éxito',
-      httpCode: 200,
-    }),
-  };
+  const validateIdentityUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<ValidateIdentityUseCase, 'run'>;
 
-  const mockCreateAccountUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: null,
-      message: 'Cuenta creada con éxito',
-      httpCode: 200,
-    }),
-  };
+  const createAccountUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<CreateAccountUseCase, 'run'>;
+
+  const resendCodeUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<ResendCodeUseCase, 'run'>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
-        { provide: LoginUseCase, useValue: mockLoginUseCase },
+        {
+          provide: LoginUseCase,
+          useValue: loginUseCase,
+        },
         {
           provide: ValidateIdentityUseCase,
-          useValue: mockValidateIdentityUseCase,
+          useValue: validateIdentityUseCase,
         },
         {
           provide: CreateAccountUseCase,
-          useValue: mockCreateAccountUseCase,
+          useValue: createAccountUseCase,
+        },
+        {
+          provide: ResendCodeUseCase,
+          useValue: resendCodeUseCase,
         },
       ],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
+
+    jest.clearAllMocks();
   });
 
-  it('Deberia estar definido el controlador de auth', () => {
-    expect(controller).toBeDefined();
-  });
-
-  it('deberia verificar las credenciales de un usuario, enviar un código de verificación al correo ingresado y devolver el ID de la cuenta asociada', async () => {
-    const loginDto: LoginDto = {
-      email: 'alejo@gmail.com',
-      password: 'Alejo123@',
-    };
-
-    await expect(controller.postLogin(loginDto)).resolves.toEqual({
-      data: 'test-account-id',
-      message: 'Credenciales verificadas correctamente',
-      httpCode: 200,
+  describe('initialization', () => {
+    it('debe estar definido', () => {
+      expect(controller).toBeDefined();
     });
-    expect(mockLoginUseCase.run).toHaveBeenCalledWith(loginDto);
   });
 
-  it('deberia validar la identidad de un usuario que esta intentando loguearse y devolver el token y refresh token', async () => {
-    const validateIdentityDto: ValidateIdentityDto = {
-      verificationCode: '123456',
-      accountId: 'test-account-id',
-    };
+  describe('postLogin', () => {
+    it('debe delegar las credenciales al LoginUseCase y retornar su resultado', async () => {
+      // Arrange
+      const dto: LoginDto = {
+        email: 'alejo@gmail.com',
+        password: 'Alejo123@',
+      };
 
-    await expect(
-      controller.postValidateAccount(validateIdentityDto),
-    ).resolves.toEqual({
-      data: {
+      const expectedResult = 'test-account-id';
+
+      loginUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.postLogin(dto);
+
+      // Assert
+      expect(loginUseCase.run).toHaveBeenCalledTimes(1);
+      expect(loginUseCase.run).toHaveBeenCalledWith(dto);
+      expect(result).toBe(expectedResult);
+    });
+  });
+
+  describe('postValidateAccount', () => {
+    it('debe delegar los datos al ValidateIdentityUseCase y retornar su resultado', async () => {
+      // Arrange
+      const dto: ValidateIdentityDto = {
+        verificationCode: '123456',
+        accountId: 'test-account-id',
+      };
+
+      const expectedResult = {
         token: 'test-token',
         refreshToken: 'test-refresh-token',
-      },
-      message: 'Identidad verificada con éxito',
-      httpCode: 200,
-    });
+      };
 
-    expect(mockValidateIdentityUseCase.run).toHaveBeenCalledWith(
-      validateIdentityDto,
-    );
+      validateIdentityUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.postValidateAccount(dto);
+
+      // Assert
+      expect(validateIdentityUseCase.run).toHaveBeenCalledTimes(1);
+      expect(validateIdentityUseCase.run).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(expectedResult);
+    });
   });
 
-  it('deberia crear una nueva cuenta de usuario con email y contraseña', async () => {
-    const createAccountDto: CreateAccountDto = {
-      email: 'diego@gmail.com',
-      password: 'Diego123@',
-      fullname: 'Diego Diaz',
-      phone: '3105073199',
-      roleId: 'role-test-id',
-    };
+  describe('postCreateAccount', () => {
+    it('debe delegar los datos al CreateAccountUseCase y retornar su resultado', async () => {
+      // Arrange
+      const dto: CreateAccountDto = {
+        email: 'diego@gmail.com',
+        password: 'Diego123@',
+        fullname: 'Diego Diaz',
+        phone: '3105073199',
+        roleId: 'role-test-id',
+      };
 
-    await expect(
-      controller.postCreateAccount(createAccountDto),
-    ).resolves.toEqual({
-      data: null,
-      message: 'Cuenta creada con éxito',
-      httpCode: 200,
+      const expectedResult = undefined;
+
+      createAccountUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.postCreateAccount(dto);
+
+      // Assert
+      expect(createAccountUseCase.run).toHaveBeenCalledTimes(1);
+      expect(createAccountUseCase.run).toHaveBeenCalledWith(dto);
+      expect(result).toBe(expectedResult);
     });
+  });
 
-    expect(mockCreateAccountUseCase.run).toHaveBeenCalledWith(createAccountDto);
+  describe('postResendCode', () => {
+    it('debe delegar los datos al ResendCodeUseCase y retornar su resultado', async () => {
+      // Arrange
+      const dto: ResendCodeDto = {
+        accountId: 'test-account-id',
+        email: 'test@gmail.com',
+        expiredCode: '123456',
+      };
+
+      const expectedResult = undefined;
+
+      resendCodeUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.postResendCode(dto);
+
+      // Assert
+      expect(resendCodeUseCase.run).toHaveBeenCalledTimes(1);
+      expect(resendCodeUseCase.run).toHaveBeenCalledWith(dto);
+      expect(result).toBe(expectedResult);
+    });
   });
 });

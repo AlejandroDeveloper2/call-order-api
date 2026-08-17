@@ -15,6 +15,7 @@ import {
 import {
   CreateAccountUseCase,
   LoginUseCase,
+  ResendCodeUseCase,
   ValidateIdentityUseCase,
 } from './application/use-cases';
 
@@ -69,6 +70,7 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
     LoginUseCase,
     ValidateIdentityUseCase,
     CreateAccountUseCase,
+    ResendCodeUseCase,
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
     {

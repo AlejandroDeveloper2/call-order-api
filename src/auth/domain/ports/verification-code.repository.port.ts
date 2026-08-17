@@ -1,12 +1,12 @@
 import { VerificationCode } from '../entities';
+import { UpdateCodeMetaInput } from '../types';
 
 export abstract class VerificationCodeRepositoryPort {
   abstract findByAccountId(accountId: string): Promise<VerificationCode[]>;
   abstract create(verificationCode: VerificationCode): Promise<void>;
   abstract updateCodeHash(
     verificationCodeId: string,
-    attempts: number,
-    codeHash: string,
+    updateCodeMetaInput: UpdateCodeMetaInput,
   ): Promise<number>;
   abstract invalidateCode(
     verificationCodeId: string,
