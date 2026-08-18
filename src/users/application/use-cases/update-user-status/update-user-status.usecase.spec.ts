@@ -4,21 +4,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
 
 /** Excepciones de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
+import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
 
 /** Dtos */
 import { UpdateUserStatusDto } from '../../dto';
 /** Caso de uso */
 import { UpdateUserStatusUseCase } from './update-user-status.usecase';
 
-jest.mock('uuid', () => ({
-  v4: () => 'test-user-id',
-}));
-
 describe('UpdateUserStatusUseCase', () => {
   let useCase: UpdateUserStatusUseCase;
 
-  const userRepository = {
+  const mockUserRepository = {
     activate: jest.fn(),
     deactivate: jest.fn(),
   } satisfies Pick<UserRepositoryPort, 'activate' | 'deactivate'>;
@@ -29,79 +25,105 @@ describe('UpdateUserStatusUseCase', () => {
         UpdateUserStatusUseCase,
         {
           provide: USER_REPOSITORY,
-          useValue: userRepository,
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
 
     useCase = module.get(UpdateUserStatusUseCase);
-  });
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   describe('run()', () => {
     it('debe lanzar AppError cuando el perfil no existe en el caso de activación del perfil', async () => {
-      const profileId = 'test-user-id';
+      //Arrange
+      const wrongProfileId = 'wrong-user-id';
       const dto: UpdateUserStatusDto = {
         status: 'active',
       };
 
-      userRepository.activate.mockResolvedValue(0);
+      mockUserRepository.activate.mockResolvedValue(0);
 
-      await expect(useCase.run(profileId, dto)).rejects.toBeInstanceOf(
-        AppError,
-      );
+      //Act
+      const result = useCase.run(wrongProfileId, dto);
 
-      expect(userRepository.activate).toHaveBeenCalledWith(profileId);
-      expect(userRepository.deactivate).not.toHaveBeenCalled();
+      //Assert
+      await expect(result).rejects.toMatchObject({
+        name: USER_ERROR_CODES.userNotFound,
+        httpCode: 404,
+      });
+
+      expect(mockUserRepository.activate).toHaveBeenCalledWith(wrongProfileId);
+      expect(mockUserRepository.deactivate).not.toHaveBeenCalled();
     });
 
     it('debe lanzar AppError cuando el perfil no existe en el caso de desactivación del perfil', async () => {
-      const profileId = 'test-user-id';
+      //Arrange
+      const wrongProfileId = 'wrong-user-id';
       const dto: UpdateUserStatusDto = {
         status: 'inactive',
       };
 
-      userRepository.deactivate.mockResolvedValue(0);
+      mockUserRepository.deactivate.mockResolvedValue(0);
 
-      await expect(useCase.run(profileId, dto)).rejects.toBeInstanceOf(
-        AppError,
+      //Act
+      const result = useCase.run(wrongProfileId, dto);
+
+      //Assert
+      await expect(result).rejects.toMatchObject({
+        name: USER_ERROR_CODES.userNotFound,
+        httpCode: 404,
+      });
+
+      expect(mockUserRepository.deactivate).toHaveBeenCalledWith(
+        wrongProfileId,
       );
-
-      expect(userRepository.deactivate).toHaveBeenCalledWith(profileId);
-      expect(userRepository.activate).not.toHaveBeenCalled();
+      expect(mockUserRepository.activate).not.toHaveBeenCalled();
     });
 
     it('debe actualizar el estado de un perfil de usuario a `activo` cuando este existe', async () => {
+      //Arrange
       const profileId = 'test-user-id';
       const dto: UpdateUserStatusDto = {
         status: 'active',
       };
 
-      userRepository.activate.mockResolvedValue(1);
+      mockUserRepository.activate.mockResolvedValue(1);
 
-      await expect(useCase.run(profileId, dto)).resolves.toBeUndefined();
+      //Act
+      const result = await useCase.run(profileId, dto);
 
-      expect(userRepository.activate).toHaveBeenCalledTimes(1);
+      //Assert
+      expect(result).toBeUndefined();
 
-      expect(userRepository.activate).toHaveBeenCalledWith(profileId);
+      expect(mockUserRepository.activate).toHaveBeenCalledTimes(1);
+
+      expect(mockUserRepository.activate).toHaveBeenCalledWith(profileId);
+
+      expect(mockUserRepository.deactivate).not.toHaveBeenCalled();
     });
 
     it('debe actualizar el estado de un perfil de usuario a `inactivo` cuando este existe', async () => {
+      //Arrange
       const profileId = 'test-user-id';
       const dto: UpdateUserStatusDto = {
         status: 'inactive',
       };
 
-      userRepository.deactivate.mockResolvedValue(1);
+      mockUserRepository.deactivate.mockResolvedValue(1);
 
-      await expect(useCase.run(profileId, dto)).resolves.toBeUndefined();
+      //Act
+      const result = await useCase.run(profileId, dto);
 
-      expect(userRepository.deactivate).toHaveBeenCalledTimes(1);
+      //Assert
+      expect(result).toBeUndefined();
 
-      expect(userRepository.deactivate).toHaveBeenCalledWith(profileId);
+      expect(mockUserRepository.deactivate).toHaveBeenCalledTimes(1);
+
+      expect(mockUserRepository.deactivate).toHaveBeenCalledWith(profileId);
+
+      expect(mockUserRepository.activate).not.toHaveBeenCalled();
     });
   });
 });

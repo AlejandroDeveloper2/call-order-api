@@ -4,19 +4,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
 
 /** Excepciones de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
+import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
 
 /** Caso de uso */
 import { UpdateUserAvatarUseCase } from './update-user-avatar.usecase';
 
-jest.mock('uuid', () => ({
-  v4: () => 'test-user-id',
-}));
-
 describe('UpdateUserAvatarUseCase', () => {
   let useCase: UpdateUserAvatarUseCase;
 
-  const userRepository = {
+  const mockUserRepository = {
     update: jest.fn(),
   } satisfies Pick<UserRepositoryPort, 'update'>;
 
@@ -26,43 +22,53 @@ describe('UpdateUserAvatarUseCase', () => {
         UpdateUserAvatarUseCase,
         {
           provide: USER_REPOSITORY,
-          useValue: userRepository,
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
 
     useCase = module.get(UpdateUserAvatarUseCase);
-  });
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   describe('run()', () => {
     it('debe lanzar AppError cuando el perfil no existe', async () => {
-      const profileId = 'test-user-id';
+      //Arrange
+      const wrongProfileId = 'wrong-user-id';
       const avatarUrl = 'avatar-url';
 
-      userRepository.update.mockResolvedValue(0);
+      mockUserRepository.update.mockResolvedValue(0);
 
-      await expect(useCase.run(profileId, avatarUrl)).rejects.toBeInstanceOf(
-        AppError,
-      );
+      //Act
+      const result = useCase.run(wrongProfileId, avatarUrl);
 
-      expect(userRepository.update).toHaveBeenCalledWith(profileId, {
-        avatar: avatarUrl,
+      //Assert
+      await expect(result).rejects.toMatchObject({
+        name: USER_ERROR_CODES.userNotFound,
+        httpCode: 404,
       });
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        wrongProfileId,
+        expect.objectContaining<{ avatar?: string }>({ avatar: avatarUrl }),
+      );
     });
 
     it('debe actualizar el avatar cuando el usuario existe', async () => {
+      //Arrange
       const profileId = 'test-user-id';
       const avatarUrl = 'avatar-url';
 
-      userRepository.update.mockResolvedValue(undefined);
+      mockUserRepository.update.mockResolvedValue(1);
 
-      await expect(useCase.run(profileId, avatarUrl)).resolves.toBeUndefined();
+      //Act
+      const result = await useCase.run(profileId, avatarUrl);
 
-      expect(userRepository.update).toHaveBeenCalledWith(
+      //Assert
+      expect(result).toBeUndefined();
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
         profileId,
         expect.objectContaining<{ avatar?: string }>({ avatar: avatarUrl }),
       );

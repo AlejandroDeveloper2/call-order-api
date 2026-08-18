@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
 /** Entidades de dominio */
 import { User } from '../../../domain/entities';
+/** Errores */
 import { AppError } from '../../../../shared/domain/exceptions';
 import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
 

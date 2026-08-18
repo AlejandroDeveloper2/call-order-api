@@ -9,84 +9,41 @@ import {
   UpdateUserAvatarUseCase,
   UpdateUserStatusUseCase,
 } from '../../application/use-cases';
-import { UserQueryDto, UpdateUserStatusDto } from '../../application/dto';
+import {
+  UserQueryDto,
+  UpdateUserStatusDto,
+  UpdateUserDto,
+} from '../../application/dto';
 
 import { UsersController } from './users.controller';
 import { CloudinaryAdpater } from '../../../shared/infrastructure/adapters';
 
-// SharedModule removed to keep unit test isolated from global providers
-
-jest.mock('uuid', () => ({
-  v4: () => 'test-user-id',
-}));
-
 describe('UsersController', () => {
   let controller: UsersController;
 
-  const expectedUser = new User(
-    'user-1',
-    'Juan Perez',
-    'test-account-id',
-    'role-1',
-    undefined,
-    '3105047899',
-    true,
-    {
-      accountId: 'test-account-id',
-      email: 'juan@gmail.com',
-      passwordHash: 'hash',
-      mustChangePassword: false,
-      lastLoginAt: new Date(),
-      failedAttempts: 0,
-    },
-    { roleId: 'role-1', name: 'Administrador' },
-  );
-  const expectedPaginatedList = {
-    records: [expectedUser],
-    page: 1,
-    totalPages: 1,
-    totalRecords: 1,
-  };
-
   const mockFindUserByAccountUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: expectedUser,
-      message: 'Perfil de usuario obtenido correctamente',
-      httpCode: 200,
-    }),
-  };
+    run: jest.fn(),
+  } satisfies Pick<FindUserByAccountUseCase, 'run'>;
 
   const mockFindUsersUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: expectedPaginatedList,
-      message: 'Usuarios obtenidos correctamente',
-      httpCode: 200,
-    }),
-  };
+    run: jest.fn(),
+  } satisfies Pick<FindUsersUseCase, 'run'>;
 
   const mockUpdateProfileUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: null,
-      message: 'Perfil de usuario actualizado correctamente',
-      httpCode: 200,
-    }),
-  };
+    run: jest.fn(),
+  } satisfies Pick<UpdateProfileUseCase, 'run'>;
 
   const mockUpdateUserStatusUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: null,
-      message: 'Estado del usuario actualizado correctamente',
-      httpCode: 200,
-    }),
-  };
+    run: jest.fn(),
+  } satisfies Pick<UpdateUserStatusUseCase, 'run'>;
 
   const mockUpdateUserAvatarUseCase = {
-    run: jest.fn().mockResolvedValue({
-      data: null,
-      message: 'Avatar actualizado correctamente',
-      httpCode: 200,
-    }),
-  };
+    run: jest.fn(),
+  } satisfies Pick<UpdateUserAvatarUseCase, 'run'>;
+
+  const mockCloudinaryAdapter = {
+    uploadFile: jest.fn(),
+  } satisfies Pick<CloudinaryAdpater, 'uploadFile'>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -94,11 +51,7 @@ describe('UsersController', () => {
       providers: [
         {
           provide: CloudinaryAdpater,
-          useValue: {
-            uploadFile: jest
-              .fn()
-              .mockResolvedValue({ secure_url: 'avatar-url' }),
-          },
+          useValue: mockCloudinaryAdapter,
         },
         {
           provide: FindUserByAccountUseCase,
@@ -118,97 +71,159 @@ describe('UsersController', () => {
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
+
+    jest.clearAllMocks();
   });
 
-  it('Deberia estar definido el controlador de usuarios', () => {
-    expect(controller).toBeDefined();
+  describe('initialization', () => {
+    it('debe estar definido', () => {
+      expect(controller).toBeDefined();
+    });
   });
 
-  it('deberia devolver el perfil del usuario que coincida con el accountId', async () => {
-    const accountId: string = 'test-account-id';
+  describe('getByAccountId', () => {
+    it('debe delegar los datos al getByAccpuntId y retornar su resultado', async () => {
+      //Arrange
+      const accountId: string = 'test-account-id';
 
-    await expect(controller.getByAccountId(accountId)).resolves.toEqual({
-      data: expectedUser,
-      message: 'Perfil de usuario obtenido correctamente',
-      httpCode: 200,
+      const expectedResult = expect.any(User) as User;
+
+      mockFindUserByAccountUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.getByAccountId(accountId);
+
+      //Assert
+      expect(mockFindUserByAccountUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockFindUserByAccountUseCase.run).toHaveBeenCalledWith(accountId);
+      expect(result).toBe(expectedResult);
     });
-    expect(mockFindUserByAccountUseCase.run).toHaveBeenCalledWith(accountId);
   });
 
-  it('deberia devolver un listado paginado de usuarios segun una query', async () => {
-    const query: UserQueryDto = {};
+  describe('getUsers', () => {
+    it('debe delegar los datos al getUsers y retornar su resultado', async () => {
+      //Arrange
+      const query: UserQueryDto = {};
 
-    await expect(controller.getUsers(query)).resolves.toEqual({
-      data: expectedPaginatedList,
-      message: 'Usuarios obtenidos correctamente',
-      httpCode: 200,
+      const expectedResult = {
+        records: expect.any([User]) as User[],
+        page: expect.any(Number) as number,
+        totalPages: expect.any(Number) as number,
+        totalRecords: expect.any(Number) as number,
+      };
+
+      mockFindUsersUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.getUsers(query);
+
+      //Assert
+      expect(mockFindUsersUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockFindUsersUseCase.run).toHaveBeenCalledWith(query);
+      expect(result).toBe(expectedResult);
     });
-    expect(mockFindUsersUseCase.run).toHaveBeenCalledWith(query);
   });
 
-  it('deberia actualizar el perfil de un usuario que corresponde a un determinado id', async () => {
-    const profileId = 'test-user-id';
-    const profileToUpdate = {
-      fullname: 'Luis Casas',
-      phone: '3154667899',
-    };
-    await expect(
-      controller.patchProfile(profileId, profileToUpdate),
-    ).resolves.toEqual({
-      data: null,
-      message: 'Perfil de usuario actualizado correctamente',
-      httpCode: 200,
+  describe('patchProfile', () => {
+    it('debe delegar los datos al patchProfile y retornar su resultado', async () => {
+      //Arrange
+      const profileId = 'test-user-id';
+      const updateUserDto: UpdateUserDto = {
+        fullname: 'Luis Casas',
+        phone: '3154667899',
+      };
+
+      const expectedResult = undefined;
+
+      mockUpdateProfileUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.patchProfile(profileId, updateUserDto);
+
+      //Assert
+      expect(mockUpdateProfileUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockUpdateProfileUseCase.run).toHaveBeenCalledWith(
+        profileId,
+        updateUserDto,
+      );
+      expect(result).toBe(expectedResult);
     });
-    expect(mockUpdateProfileUseCase.run).toHaveBeenCalledWith(
-      profileId,
-      profileToUpdate,
-    );
   });
 
-  it('deberia actualizar el estado de un perfil de usuario que corresponde a un determinado id', async () => {
-    const profileId = 'test-user-id';
-    const statusToUpdate1: UpdateUserStatusDto = { status: 'active' };
-    const statusToUpdate2: UpdateUserStatusDto = { status: 'inactive' };
+  describe('patchUserStatus', () => {
+    it('debe delegar los datos al patchUserStatus y retornar su resultado (Caso activar perfil)', async () => {
+      //Arrange
+      const profileId = 'test-user-id';
+      const updateUserStatusDto: UpdateUserStatusDto = {
+        status: 'active',
+      };
 
-    await expect(
-      controller.patchUserStatus(profileId, statusToUpdate1),
-    ).resolves.toEqual({
-      data: null,
-      message: 'Estado del usuario actualizado correctamente',
-      httpCode: 200,
-    });
-    expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledWith(
-      profileId,
-      statusToUpdate1,
-    );
+      const expectedResult = undefined;
 
-    await expect(
-      controller.patchUserStatus(profileId, statusToUpdate2),
-    ).resolves.toEqual({
-      data: null,
-      message: 'Estado del usuario actualizado correctamente',
-      httpCode: 200,
+      mockUpdateUserStatusUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.patchUserStatus(
+        profileId,
+        updateUserStatusDto,
+      );
+
+      //Assert
+      expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledWith(
+        profileId,
+        updateUserStatusDto,
+      );
+      expect(result).toBe(expectedResult);
     });
-    expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledWith(
-      profileId,
-      statusToUpdate2,
-    );
+
+    it('debe delegar los datos al patchUserStatus y retornar su resultado (Caso inactivar perfil)', async () => {
+      //Arrange
+      const profileId = 'test-user-id';
+      const updateUserStatusDto: UpdateUserStatusDto = {
+        status: 'inactive',
+      };
+
+      const expectedResult = undefined;
+
+      mockUpdateUserStatusUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.patchUserStatus(
+        profileId,
+        updateUserStatusDto,
+      );
+
+      //Assert
+      expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockUpdateUserStatusUseCase.run).toHaveBeenCalledWith(
+        profileId,
+        updateUserStatusDto,
+      );
+      expect(result).toBe(expectedResult);
+    });
   });
 
-  it('deberia actualizar el avatar del usuario', async () => {
-    const profileId = 'test-user-id';
-    const avatarUrl = 'avatar-url';
+  describe('patchUserAvatar', () => {
+    it('debe delegar los datos al patchUserAvatar y retornar su resultado', async () => {
+      //Arrange
+      const profileId = 'test-user-id';
+      const avatarUrl = 'avatar-url';
 
-    await expect(
-      controller.patchUserAvatar(profileId, avatarUrl),
-    ).resolves.toEqual({
-      data: null,
-      message: 'Avatar actualizado correctamente',
-      httpCode: 200,
+      const expectedResult = undefined;
+
+      mockUpdateUserAvatarUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.patchUserAvatar(profileId, avatarUrl);
+
+      //Assert
+      expect(mockUpdateUserAvatarUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockUpdateUserAvatarUseCase.run).toHaveBeenCalledWith(
+        profileId,
+        avatarUrl,
+      );
+      expect(result).toBe(expectedResult);
     });
-    expect(mockUpdateUserAvatarUseCase.run).toHaveBeenCalledWith(
-      profileId,
-      avatarUrl,
-    );
   });
 });

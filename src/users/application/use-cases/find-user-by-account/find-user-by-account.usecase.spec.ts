@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
 /** Excepciones de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
+import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
 /** Entidad de dominio */
 import { User } from '../../../domain/entities';
 /** Puertos */
@@ -13,7 +13,7 @@ import { FindUserByAccountUseCase } from './find-user-by-account.usecase';
 describe('FindUserByAccountUseCase', () => {
   let useCase: FindUserByAccountUseCase;
 
-  const userRepository = {
+  const mockUserRepository = {
     findByAccountId: jest.fn(),
   } satisfies Pick<UserRepositoryPort, 'findByAccountId'>;
 
@@ -23,33 +23,42 @@ describe('FindUserByAccountUseCase', () => {
         FindUserByAccountUseCase,
         {
           provide: USER_REPOSITORY,
-          useValue: userRepository,
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
 
     useCase = module.get(FindUserByAccountUseCase);
-  });
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   describe('run()', () => {
     it('debe lanzar AppError cuando el perfil de usuario no existe', async () => {
+      //Arrange
       const accountId: string = 'test-account-id';
 
-      userRepository.findByAccountId.mockResolvedValue(null);
+      mockUserRepository.findByAccountId.mockResolvedValue(null);
 
-      await expect(useCase.run(accountId)).rejects.toBeInstanceOf(AppError);
+      //Act
+      const profile = useCase.run(accountId);
 
-      expect(userRepository.findByAccountId).toHaveBeenCalledWith(accountId);
+      //Assert
+      await expect(profile).rejects.toMatchObject({
+        name: USER_ERROR_CODES.userNotFound,
+        httpCode: 404,
+      });
+
+      expect(mockUserRepository.findByAccountId).toHaveBeenCalledWith(
+        accountId,
+      );
     });
 
     it('debe traer un usuario cuando el accountId corresponde a un usuario registrado', async () => {
+      //Arrange
       const accountId: string = 'test-account-id';
 
-      const expectedUser = new User(
+      const expectedProfile = new User(
         'user-1',
         'Juan Perez',
         'test-account-id',
@@ -68,11 +77,17 @@ describe('FindUserByAccountUseCase', () => {
         { roleId: 'role-1', name: 'Administrador' },
       );
 
-      userRepository.findByAccountId.mockResolvedValue(expectedUser);
+      mockUserRepository.findByAccountId.mockResolvedValue(expectedProfile);
 
-      await expect(useCase.run(accountId)).resolves.toBe(expectedUser);
+      //Act
+      const profile = await useCase.run(accountId);
 
-      expect(userRepository.findByAccountId).toHaveBeenCalledWith(accountId);
+      //Assert
+      expect(profile).toBe(expectedProfile);
+
+      expect(mockUserRepository.findByAccountId).toHaveBeenCalledWith(
+        accountId,
+      );
     });
   });
 });

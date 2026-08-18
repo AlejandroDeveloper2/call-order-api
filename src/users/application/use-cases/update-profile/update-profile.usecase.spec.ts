@@ -4,21 +4,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
 
 /** Excepciones de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
+import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
 
 /** Dtos */
 import { UpdateUserDto } from '../../dto';
 /** Caso de uso */
 import { UpdateProfileUseCase } from './update-profile.usecase';
 
-jest.mock('uuid', () => ({
-  v4: () => 'test-user-id',
-}));
-
 describe('UpdateProfileUseCase', () => {
   let useCase: UpdateProfileUseCase;
 
-  const userRepository = {
+  const mockUserRepository = {
     update: jest.fn(),
   } satisfies Pick<UserRepositoryPort, 'update'>;
 
@@ -28,49 +24,61 @@ describe('UpdateProfileUseCase', () => {
         UpdateProfileUseCase,
         {
           provide: USER_REPOSITORY,
-          useValue: userRepository,
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
 
     useCase = module.get(UpdateProfileUseCase);
-  });
 
-  afterEach(() => {
     jest.clearAllMocks();
   });
 
   describe('run()', () => {
     it('debe lanzar AppError cuando el perfil no existe', async () => {
-      const profileId = 'test-user-id';
+      //Arrange
+      const wrongProfileId = 'wrong-user-id';
       const dto: UpdateUserDto = {
         fullname: 'Juan Pérez',
         phone: '3001234567',
       };
 
-      userRepository.update.mockResolvedValue(0);
+      mockUserRepository.update.mockResolvedValue(0);
 
-      await expect(useCase.run(profileId, dto)).rejects.toBeInstanceOf(
-        AppError,
+      //Act
+      const result = useCase.run(wrongProfileId, dto);
+
+      //Assert
+      await expect(result).rejects.toMatchObject({
+        name: USER_ERROR_CODES.userNotFound,
+        httpCode: 404,
+      });
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        wrongProfileId,
+        expect.objectContaining(dto),
       );
-
-      expect(userRepository.update).toHaveBeenCalledWith(profileId, dto);
     });
 
     it('debe actualizar un perfil de usuario cuando este existe', async () => {
+      //Arrange
       const profileId = 'test-user-id';
       const dto: UpdateUserDto = {
         fullname: 'Juan Pérez',
         phone: '3001234567',
       };
 
-      userRepository.update.mockResolvedValue(undefined);
+      mockUserRepository.update.mockResolvedValue(1);
 
-      await expect(useCase.run(profileId, dto)).resolves.toBeUndefined();
+      //Act
+      const result = await useCase.run(profileId, dto);
 
-      expect(userRepository.update).toHaveBeenCalledWith(
+      //Assert
+      expect(result).toBeUndefined();
+
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
         profileId,
-        expect.objectContaining<UpdateUserDto>(dto),
+        expect.objectContaining(dto),
       );
     });
   });
