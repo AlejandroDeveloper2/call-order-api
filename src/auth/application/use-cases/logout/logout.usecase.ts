@@ -16,18 +16,18 @@ export class LogoutUseCase {
   constructor(
     @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: SessionRepositoryPort,
-  ) {}
+  ) { }
 
-  async run(accountId: string, refreshToken: string): Promise<void> {
+  async run(accountId: string, token: string): Promise<void> {
     /** Obtener las sessiones activas asociadas a la cuenta  */
     const sessions = await this.sessionRepository.findByAccountId(accountId);
 
-    /** Comparar el hash del refresh token para filtrar la sesión actual */
+    /** Comparar el hash del token para filtrar la sesión actual */
     const results = await Promise.all(
       sessions.map(async (session) => {
         const isValid = await bcrypt.compare(
-          refreshToken,
-          session.refreshTokenHash,
+          token,
+          session.tokenHash,
         );
         return { ...session, isValid };
       }),

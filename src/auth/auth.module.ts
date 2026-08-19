@@ -17,6 +17,7 @@ import {
   LoginUseCase,
   ResendCodeUseCase,
   ValidateIdentityUseCase,
+  LogoutUseCase
 } from './application/use-cases';
 
 /** Controladores */
@@ -71,6 +72,7 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
     ValidateIdentityUseCase,
     CreateAccountUseCase,
     ResendCodeUseCase,
+    LogoutUseCase,
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
     {
@@ -80,4 +82,4 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
   ],
   exports: [PermissionsGuard],
 })
-export class AuthModule {}
+export class AuthModule { }

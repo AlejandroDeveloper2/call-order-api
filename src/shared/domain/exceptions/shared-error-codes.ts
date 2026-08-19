@@ -7,4 +7,6 @@ export const SHARED_ERROR_CODES = {
   imageUploadError: 'IMAGE_UPLOAD_ERROR',
   fileNotProvided: 'FILE_NOT_PROVIDED',
   refreshNotProvided: 'REFRESH_NOT_PROVIDED',
+  missingToken: 'MISSING_TOKEN',
+  invalidToken: 'INVALID_TOKEN',
 };

@@ -6,7 +6,6 @@ import { PERMISSION_REPOSITORY, USER_REPOSITORY } from './domain/ports';
 
 /** Casos de uso */
 import {
-  CreateUserUseCase,
   FindUserByAccountUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
@@ -48,7 +47,6 @@ import { SharedModule } from '../shared/shared.module';
   ],
   controllers: [UsersController],
   providers: [
-    CreateUserUseCase,
     FindUserByAccountUseCase,
     FindUsersUseCase,
     UpdateProfileUseCase,
@@ -57,6 +55,6 @@ import { SharedModule } from '../shared/shared.module';
     { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
     { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },
   ],
-  exports: [CreateUserUseCase, USER_REPOSITORY, PERMISSION_REPOSITORY],
+  exports: [USER_REPOSITORY, PERMISSION_REPOSITORY],
 })
-export class UsersModule {}
+export class UsersModule { }
