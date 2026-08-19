@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import {
   CreateAccountUseCase,
   LoginUseCase,
+  LogoutUseCase,
   ResendCodeUseCase,
   ValidateIdentityUseCase,
 } from '../../application/use-cases';
@@ -42,6 +43,16 @@ describe('AuthController', () => {
     run: jest.fn(),
   } satisfies Pick<ResendCodeUseCase, 'run'>;
 
+  const logoutUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<LogoutUseCase, 'run'>;
+
+  /** Mock de Response de Express para simular el manejo de cookies */
+  const mockRes = {
+    cookie: jest.fn(),
+    clearCookie: jest.fn(),
+  } as unknown as import('express').Response;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -61,6 +72,10 @@ describe('AuthController', () => {
         {
           provide: ResendCodeUseCase,
           useValue: resendCodeUseCase,
+        },
+        {
+          provide: LogoutUseCase,
+          useValue: logoutUseCase,
         },
       ],
     }).compile();
@@ -99,7 +114,7 @@ describe('AuthController', () => {
   });
 
   describe('postValidateAccount', () => {
-    it('debe delegar los datos al ValidateIdentityUseCase y retornar su resultado', async () => {
+    it('debe delegar los datos al ValidateIdentityUseCase, setear la cookie y retornar los tokens', async () => {
       // Arrange
       const dto: ValidateIdentityDto = {
         verificationCode: '123456',
@@ -114,11 +129,24 @@ describe('AuthController', () => {
       validateIdentityUseCase.run.mockResolvedValue(expectedResult);
 
       // Act
-      const result = await controller.postValidateAccount(dto);
+      const result = await controller.postValidateAccount(mockRes, dto);
 
       // Assert
       expect(validateIdentityUseCase.run).toHaveBeenCalledTimes(1);
       expect(validateIdentityUseCase.run).toHaveBeenCalledWith(dto);
+
+      expect(mockRes.cookie).toHaveBeenCalledTimes(1);
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expectedResult.refreshToken,
+        expect.objectContaining({
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          path: '/',
+        }),
+      );
+
       expect(result).toEqual(expectedResult);
     });
   });
@@ -167,6 +195,38 @@ describe('AuthController', () => {
       // Assert
       expect(resendCodeUseCase.run).toHaveBeenCalledTimes(1);
       expect(resendCodeUseCase.run).toHaveBeenCalledWith(dto);
+      expect(result).toBe(expectedResult);
+    });
+  });
+
+  describe('postLogout', () => {
+    it('debe delegar los datos al LogoutUseCase, limpiar la cookie y retornar su resultado', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+      const token = 'test-token';
+
+      const expectedResult = undefined;
+
+      logoutUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.postLogout(mockRes, token, accountId);
+
+      // Assert
+      expect(logoutUseCase.run).toHaveBeenCalledTimes(1);
+      expect(logoutUseCase.run).toHaveBeenCalledWith(accountId, token);
+
+      expect(mockRes.clearCookie).toHaveBeenCalledTimes(1);
+      expect(mockRes.clearCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expect.objectContaining({
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          path: '/',
+        }),
+      );
+
       expect(result).toBe(expectedResult);
     });
   });

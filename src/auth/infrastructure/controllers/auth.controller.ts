@@ -19,9 +19,13 @@ import {
 } from '../../application/dto';
 
 /** Decoradores */
-import { ApiMessage, BearerToken, Cookie, GetAccount } from '../../../shared/infrastructure/decorators';
+import {
+  ApiMessage,
+  BearerToken,
+  Cookie,
+  GetAccount,
+} from '../../../shared/infrastructure/decorators';
 import { Auth } from '../decorators';
-
 
 @Controller('auth')
 export class AuthController {
@@ -31,7 +35,7 @@ export class AuthController {
     private readonly createAccountUseCase: CreateAccountUseCase,
     private readonly resendCodeUseCase: ResendCodeUseCase,
     private readonly logoutUseCase: LogoutUseCase,
-  ) { }
+  ) {}
 
   @Post('/login')
   @ApiMessage('Credenciales verificadas correctamente')
@@ -43,9 +47,10 @@ export class AuthController {
   @ApiMessage('Identidad verificada con éxito')
   async postValidateAccount(
     @Res({ passthrough: true }) res: Response,
-    @Body() validateIdentityDto: ValidateIdentityDto
+    @Body() validateIdentityDto: ValidateIdentityDto,
   ) {
-    const { refreshToken, token } = await this.validateAccountUseCase.run(validateIdentityDto);
+    const { refreshToken, token } =
+      await this.validateAccountUseCase.run(validateIdentityDto);
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
@@ -55,7 +60,7 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 semana
     });
 
-    return { token, refreshToken }
+    return { token, refreshToken };
   }
 
   @Post('/register')
@@ -76,7 +81,7 @@ export class AuthController {
   async postLogout(
     @Res({ passthrough: true }) res: Response,
     @BearerToken() token: string,
-    @GetAccount('accountId', ParseUUIDPipe) accountId: string
+    @GetAccount('accountId', ParseUUIDPipe) accountId: string,
   ) {
     await this.logoutUseCase.run(accountId, token);
 
@@ -87,6 +92,6 @@ export class AuthController {
       path: '/',
     });
 
-    return null;
+    return undefined;
   }
 }
