@@ -24,7 +24,7 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
   constructor(
     @InjectRepository(PostgresAccountSchema)
     private readonly accountRepository: Repository<PostgresAccountSchema>,
-  ) {}
+  ) { }
 
   private resolveManager(context?: TransactionContext): EntityManager {
     if (context instanceof TypeOrmTransactionContext) {
@@ -61,40 +61,15 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
       return handleServerError(error);
     }
   }
-  async updateEmail(accountId: string, updatedEmail: string): Promise<number> {
-    try {
-      const result = await this.accountRepository.update(
-        { id: accountId },
-        { email: updatedEmail },
-      );
-      return result.affected || 0;
-    } catch (error: unknown) {
-      return handleServerError(error);
-    }
-  }
-  async updatePassword(
-    accountId: string,
-    updatedPassword: string,
-  ): Promise<number> {
-    try {
-      const result = await this.accountRepository.update(
-        { id: accountId },
-        { passwordHash: updatedPassword },
-      );
-      return result.affected || 0;
-    } catch (error: unknown) {
-      return handleServerError(error);
-    }
-  }
+
   async update(
     accountId: string,
     updateAccountMetaInput: UpdateAccountMetaInput,
+    context?: TransactionContext,
   ): Promise<number> {
     try {
-      const result = await this.accountRepository.update(
-        { id: accountId },
-        { ...updateAccountMetaInput },
-      );
+      const manager = this.resolveManager(context);
+      const result = await manager.update(PostgresAccountSchema, { id: accountId }, updateAccountMetaInput);
       return result.affected || 0;
     } catch (error: unknown) {
       return handleServerError(error);

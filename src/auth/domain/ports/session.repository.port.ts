@@ -1,21 +1,16 @@
+import { TransactionContext } from '../../../shared/domain/ports';
 import { Session } from '../entities';
+import { UpdateSessionInput } from '../types';
 
 export abstract class SessionRepositoryPort {
-  abstract findById(sessionId: string): Promise<Session | null>;
-  abstract create(session: Session): Promise<void>;
-  abstract revoke(sessionId: string, revokedAt: Date): Promise<number>;
-  abstract updateRefresh(
+  abstract findByAccountId(accountId: string): Promise<Session[]>;
+  abstract create(
+    session: Session,
+    context?: TransactionContext,
+  ): Promise<void>;
+  abstract update(
     sessionId: string,
-    refreshTokenHash: string,
-  ): Promise<number>;
-  abstract updateExpiration(
-    sessionId: string,
-    expiresAt: Date,
-  ): Promise<number>;
-
-  abstract updateLastActivity(
-    sessionId: string,
-    lastActivityAt: Date,
+    updateSessionInput: UpdateSessionInput,
   ): Promise<number>;
 
   /**

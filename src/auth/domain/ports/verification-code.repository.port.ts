@@ -1,16 +1,14 @@
+import { TransactionContext } from '../../../shared/domain/ports';
 import { VerificationCode } from '../entities';
-import { UpdateCodeMetaInput } from '../types';
+import { UpdateCodeInput } from '../types';
 
 export abstract class VerificationCodeRepositoryPort {
   abstract findByAccountId(accountId: string): Promise<VerificationCode[]>;
   abstract create(verificationCode: VerificationCode): Promise<void>;
-  abstract updateCodeHash(
+  abstract update(
     verificationCodeId: string,
-    updateCodeMetaInput: UpdateCodeMetaInput,
-  ): Promise<number>;
-  abstract invalidateCode(
-    verificationCodeId: string,
-    usedAt: Date,
+    updateCodeInput: UpdateCodeInput,
+    context?: TransactionContext,
   ): Promise<number>;
 }
 

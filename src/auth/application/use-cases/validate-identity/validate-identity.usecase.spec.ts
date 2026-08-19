@@ -8,11 +8,14 @@ import { VerificationCode } from '../../../domain/entities';
 
 /** Puertos */
 import {
+  ACCOUNT_REPOSITORY,
+  AccountRepositoryPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
+import { TRANSACTION_MANAGER, TransactionContext, TransactionManagerPort } from '../../../../shared/domain/ports';
 
 /** Errores */
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
@@ -41,16 +44,24 @@ describe('ValidateIdentityUseCase', () => {
 
   const verificationCodeRepository = {
     findByAccountId: jest.fn(),
-    invalidateCode: jest.fn(),
+    update: jest.fn(),
   } satisfies Pick<
     VerificationCodeRepositoryPort,
-    'findByAccountId' | 'invalidateCode'
+    'findByAccountId' | 'update'
   >;
 
   const sessionRepository = {
-    revokeByAccountId: jest.fn(),
     create: jest.fn(),
-  } satisfies Pick<SessionRepositoryPort, 'revokeByAccountId' | 'create'>;
+    revokeByAccountId: jest.fn(),
+  } satisfies Pick<SessionRepositoryPort, 'create' | 'revokeByAccountId'>;
+
+  const accountRepository = {
+    update: jest.fn(),
+  } satisfies Pick<AccountRepositoryPort, 'update'>;
+
+  const mockTransactionManager = {
+    run: jest.fn(),
+  } satisfies TransactionManagerPort;
 
   const bcryptCompareMock = jest.mocked<
     (data: string | Buffer, encrypted: string) => Promise<boolean>
@@ -84,7 +95,14 @@ describe('ValidateIdentityUseCase', () => {
     return verificationCode;
   };
 
+  const transactionContext: TransactionContext = {};
+
   beforeEach(async () => {
+    mockTransactionManager.run.mockImplementation(
+      async (callback: (transactionContext: unknown) => Promise<unknown>) =>
+        callback(transactionContext),
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ValidateIdentityUseCase,
@@ -99,6 +117,14 @@ describe('ValidateIdentityUseCase', () => {
         {
           provide: SESSION_REPOSITORY,
           useValue: sessionRepository,
+        },
+        {
+          provide: ACCOUNT_REPOSITORY,
+          useValue: accountRepository,
+        },
+        {
+          provide: TRANSACTION_MANAGER,
+          useValue: mockTransactionManager,
         },
       ],
     }).compile();
@@ -135,8 +161,12 @@ describe('ValidateIdentityUseCase', () => {
       );
 
       expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
+
+      expect(mockTransactionManager.run).not.toHaveBeenCalled();
+
       expect(sessionRepository.create).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.invalidateCode).not.toHaveBeenCalled();
+      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+      expect(accountRepository.update).not.toHaveBeenCalled();
     });
 
     it('debe lanzar AppError cuando el código ha expirado', async () => {
@@ -163,11 +193,14 @@ describe('ValidateIdentityUseCase', () => {
       });
 
       expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
+
+      expect(mockTransactionManager.run).not.toHaveBeenCalled();
       expect(sessionRepository.create).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.invalidateCode).not.toHaveBeenCalled();
+      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+      expect(accountRepository.update).not.toHaveBeenCalled();
     });
 
-    it('debe crear una nueva sesión, invalidar el código y retornar los tokens cuando la identidad es válida', async () => {
+    it('debe crear una nueva sesión, invalidar el código, marcar el último inicio de sesión dentro de una transacción y retornar los tokens cuando la identidad es válida', async () => {
       // Arrange
       const dto = buildDto({
         browser: 'Chrome',
@@ -197,7 +230,8 @@ describe('ValidateIdentityUseCase', () => {
 
       sessionRepository.revokeByAccountId.mockResolvedValue(undefined);
       sessionRepository.create.mockResolvedValue(undefined);
-      verificationCodeRepository.invalidateCode.mockResolvedValue(undefined);
+      verificationCodeRepository.update.mockResolvedValue(undefined);
+      accountRepository.update.mockResolvedValue(undefined);
 
       // Act
       const result = await useCase.run(dto);
@@ -217,10 +251,18 @@ describe('ValidateIdentityUseCase', () => {
 
       expect(bcrypt.hash).toHaveBeenCalledTimes(2);
 
+      expect(sessionRepository.revokeByAccountId).toHaveBeenCalledTimes(1);
+
       expect(sessionRepository.revokeByAccountId).toHaveBeenCalledWith(
         dto.accountId,
         expect.any(Date),
       );
+
+      expect(mockTransactionManager.run).toHaveBeenCalledTimes(1);
+
+      expect(sessionRepository.create).toHaveBeenCalledTimes(1);
+      expect(verificationCodeRepository.update).toHaveBeenCalledTimes(1);
+      expect(accountRepository.update).toHaveBeenCalledTimes(1);
 
       expect(sessionRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -235,12 +277,25 @@ describe('ValidateIdentityUseCase', () => {
           deviceName: dto.deviceName,
           deviceType: dto.deviceType,
         }),
+        transactionContext,
       );
 
-      expect(verificationCodeRepository.invalidateCode).toHaveBeenCalledWith(
+      expect(verificationCodeRepository.update).toHaveBeenCalledWith(
         validVerificationCode.verificationCodeId,
-        expect.any(Date),
+        expect.objectContaining({
+          usedAt: expect.any(Date) as Date,
+        }),
+        transactionContext,
       );
+
+      expect(accountRepository.update).toHaveBeenCalledWith(
+        dto.accountId,
+        expect.objectContaining({
+          lastLoginAt: expect.any(Date) as Date,
+        }),
+        transactionContext,
+      );
+
     });
   });
 });

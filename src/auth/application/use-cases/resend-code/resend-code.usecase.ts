@@ -83,7 +83,7 @@ export class ResendCodeUseCase {
     const codeHash = await bcrypt.hash(code, 10);
 
     /** Actualizar a nivel de base de datos el valor del nuevo código */
-    await this.verificationCodeRepository.updateCodeHash(oldVerficationCodeId, {
+    await this.verificationCodeRepository.update(oldVerficationCodeId, {
       attempts: attempts + 1,
       codeHash,
       expiresAt: addMinutes(new Date(), 10),

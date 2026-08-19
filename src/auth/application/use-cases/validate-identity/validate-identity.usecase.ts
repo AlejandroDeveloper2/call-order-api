@@ -9,11 +9,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { Session } from '../../../domain/entities';
 /** Puertos */
 import {
+  ACCOUNT_REPOSITORY,
+  AccountRepositoryPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
+import {
+  TRANSACTION_MANAGER,
+  type TransactionManagerPort,
+} from '../../../../shared/domain/ports';
 /** Errores de dominio */
 import { AppError } from '../../../../shared/domain/exceptions';
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
@@ -25,11 +31,15 @@ import { ValidateIdentityDto } from '../../dto';
 export class ValidateIdentityUseCase {
   constructor(
     private readonly tokenService: JwtService,
+    @Inject(ACCOUNT_REPOSITORY)
+    private readonly accountRepository: AccountRepositoryPort,
     @Inject(VERIFICATION_CODE_REPOSITORY)
     private readonly verificationCodeRepository: VerificationCodeRepositoryPort,
     @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: SessionRepositoryPort,
-  ) {}
+    @Inject(TRANSACTION_MANAGER)
+    private readonly transactionManager: TransactionManagerPort,
+  ) { }
 
   async run(
     validateAccountDto: ValidateIdentityDto,
@@ -106,13 +116,28 @@ export class ValidateIdentityUseCase {
       validateAccountDto.deviceType,
     );
 
-    await this.sessionRepository.create(session);
+    await this.transactionManager.run(async (context) => {
+      /** Crear sesión */
+      await this.sessionRepository.create(session, context);
 
-    /** Invalidar el código de verificación anterior */
-    await this.verificationCodeRepository.invalidateCode(
-      validCode.verificationCodeId,
-      new Date(),
-    );
+      /** Invalidar el código de verificación anterior */
+      await this.verificationCodeRepository.update(
+        validCode.verificationCodeId,
+        {
+          usedAt: new Date(),
+        },
+        context,
+      );
+
+      /** Actualizar último inicio de sesión */
+      await this.accountRepository.update(
+        validateAccountDto.accountId,
+        {
+          lastLoginAt: new Date(),
+        },
+        context,
+      );
+    });
 
     return {
       token,

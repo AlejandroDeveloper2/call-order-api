@@ -10,18 +10,10 @@ export abstract class AccountRepositoryPort {
     account: Account,
     context?: TransactionContext,
   ): Promise<void>;
-  abstract updateEmail(
-    accountId: string,
-    updatedEmail: string,
-  ): Promise<number>;
-  abstract updatePassword(
-    accountId: string,
-    updatedPassword: string,
-  ): Promise<number>;
-
   abstract update(
     accountId: string,
     updateAccountMetaInput: UpdateAccountMetaInput,
+    context?: TransactionContext,
   ): Promise<number>;
 }
 

@@ -41,10 +41,10 @@ describe('ResendCodeUseCase', () => {
 
   const verificationCodeRepository = {
     findByAccountId: jest.fn(),
-    updateCodeHash: jest.fn(),
+    update: jest.fn(),
   } satisfies Pick<
     VerificationCodeRepositoryPort,
-    'findByAccountId' | 'updateCodeHash'
+    'findByAccountId' | 'update'
   >;
 
   const emailSender = {
@@ -119,7 +119,7 @@ describe('ResendCodeUseCase', () => {
         dto.accountId,
       );
 
-      expect(verificationCodeRepository.updateCodeHash).not.toHaveBeenCalled();
+      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
 
       expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
@@ -145,7 +145,7 @@ describe('ResendCodeUseCase', () => {
         dto.accountId,
       );
 
-      expect(verificationCodeRepository.updateCodeHash).not.toHaveBeenCalled();
+      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
 
       expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
@@ -174,7 +174,7 @@ describe('ResendCodeUseCase', () => {
         .mockResolvedValue('new-hashed-code');
       jest.mocked(generateVerificationCode).mockReturnValue('654321');
 
-      verificationCodeRepository.updateCodeHash.mockResolvedValue(1);
+      verificationCodeRepository.update.mockResolvedValue(1);
       emailSender.sendEmail.mockResolvedValue(undefined);
 
       await expect(useCase.run(dto)).resolves.toBeUndefined();
@@ -187,11 +187,9 @@ describe('ResendCodeUseCase', () => {
 
       expect(bcrypt.hash).toHaveBeenCalledWith('654321', 10);
 
-      expect(verificationCodeRepository.updateCodeHash).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(verificationCodeRepository.update).toHaveBeenCalledTimes(1);
 
-      expect(verificationCodeRepository.updateCodeHash).toHaveBeenCalledWith(
+      expect(verificationCodeRepository.update).toHaveBeenCalledWith(
         verificationCode.verificationCodeId,
         expect.objectContaining({
           attempts: verificationCode.attempts + 1,

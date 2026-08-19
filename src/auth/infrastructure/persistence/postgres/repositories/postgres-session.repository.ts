@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 /** Entidad de dominio */
 import { Session } from '../../../../domain/entities';
+import { UpdateSessionInput } from '../../../../domain/types';
 /** Puertos */
 import { SessionRepositoryPort } from '../../../../domain/ports';
+import { TransactionContext } from '../../../../../shared/domain/ports';
 /** Utilidades */
 import { handleServerError } from '../../../../../shared/domain/utils/handleServerError';
 
@@ -13,74 +15,56 @@ import { handleServerError } from '../../../../../shared/domain/utils/handleServ
 import { PostgresSessionSchema } from '../schemas';
 /** Mappers */
 import { SessionMapper } from '../mappers';
+/**Adapters */
+import { TypeOrmTransactionContext } from '../../../../../shared/infrastructure/adapters';
 
 @Injectable()
 export class PostgresSessionRepository implements SessionRepositoryPort {
   constructor(
     @InjectRepository(PostgresSessionSchema)
     private readonly sessionRepository: Repository<PostgresSessionSchema>,
-  ) {}
-  async findById(sessionId: string): Promise<Session | null> {
+  ) { }
+
+  private resolveManager(context?: TransactionContext): EntityManager {
+    if (context instanceof TypeOrmTransactionContext) {
+      return context.manager;
+    }
+
+    return this.sessionRepository.manager;
+  }
+
+  async findByAccountId(accountId: string): Promise<Session[]> {
     try {
-      const session = await this.sessionRepository.findOneBy({ id: sessionId });
-      if (!session) return null;
-      return SessionMapper.toDomain(session);
+      const qb = this.sessionRepository
+        .createQueryBuilder()
+        .select()
+        .where('accountId = :accountId', { accountId })
+        .andWhere('revokedAt IS NULL');
+
+      const schemas = await qb.getMany();
+
+      return schemas.map((schema) => SessionMapper.toDomain(schema));
     } catch (error: unknown) {
       return handleServerError(error);
     }
   }
-  async create(session: Session): Promise<void> {
+  async create(session: Session, context?: TransactionContext): Promise<void> {
     try {
+      const manager = this.resolveManager(context);
       const schema = SessionMapper.toPersistence(session);
-      await this.sessionRepository.save(schema);
+      await manager.save(schema);
     } catch (error: unknown) {
       return handleServerError(error);
     }
   }
-  async revoke(sessionId: string, revokedAt: Date): Promise<number> {
-    try {
-      const result = await this.sessionRepository.update(
-        { id: sessionId },
-        { revokedAt },
-      );
-      return result.affected || 0;
-    } catch (error: unknown) {
-      return handleServerError(error);
-    }
-  }
-  async updateRefresh(
+  async update(
     sessionId: string,
-    refreshTokenHash: string,
+    updateSessionInput: UpdateSessionInput,
   ): Promise<number> {
     try {
       const result = await this.sessionRepository.update(
         { id: sessionId },
-        { refreshTokenHash },
-      );
-      return result.affected || 0;
-    } catch (error: unknown) {
-      return handleServerError(error);
-    }
-  }
-  async updateExpiration(sessionId: string, expiresAt: Date): Promise<number> {
-    try {
-      const result = await this.sessionRepository.update(
-        { id: sessionId },
-        { expiresAt },
-      );
-      return result.affected || 0;
-    } catch (error: unknown) {
-      return handleServerError(error);
-    }
-  }
-  async updateLastActivity(
-    sessionId: string,
-    lastActivityAt: Date,
-  ): Promise<number> {
-    try {
-      const result = await this.sessionRepository.update(
-        { id: sessionId },
-        { lastActivityAt },
+        { ...updateSessionInput },
       );
       return result.affected || 0;
     } catch (error: unknown) {

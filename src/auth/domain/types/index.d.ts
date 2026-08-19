@@ -4,12 +4,29 @@ interface UpdateAccountMetaInput {
   lastLoginAt?: Date;
   failedAttempts?: number;
   lockedUtil?: Date;
+  email?: string;
+  passwordHash?: string;
 }
 
-interface UpdateCodeMetaInput {
-  attempts: number;
-  codeHash: string;
-  expiresAt: Date;
+interface UpdateCodeInput {
+  attempts?: number;
+  codeHash?: string;
+  expiresAt?: Date;
+  usedAt?: Date;
 }
 
-export { VerificationCodeType, UpdateAccountMetaInput, UpdateCodeMetaInput };
+interface UpdateSessionInput {
+  refreshTokenHash?: string;
+  tokenHash?: string;
+  revokedAt?: Date;
+  expiresAt?: Date;
+  lastActivityAt?: Date;
+}
+
+export {
+  VerificationCodeType,
+  UpdateAccountMetaInput,
+  UpdateCodeMetaInput,
+  UpdateSessionInput,
+  UpdateCodeInput,
+};
