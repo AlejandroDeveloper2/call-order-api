@@ -6,6 +6,7 @@ import {
   CreateAccountUseCase,
   LoginUseCase,
   LogoutUseCase,
+  RefreshSessionUseCase,
   ResendCodeUseCase,
   ValidateIdentityUseCase,
 } from '../../application/use-cases';
@@ -31,10 +32,11 @@ import { Auth } from '../decorators';
 export class AuthController {
   constructor(
     private readonly loginUseCase: LoginUseCase,
-    private readonly validateAccountUseCase: ValidateIdentityUseCase,
+    private readonly validateIdentityUseCase: ValidateIdentityUseCase,
     private readonly createAccountUseCase: CreateAccountUseCase,
     private readonly resendCodeUseCase: ResendCodeUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly refreshSessionUseCase: RefreshSessionUseCase,
   ) {}
 
   @Post('/login')
@@ -45,12 +47,12 @@ export class AuthController {
 
   @Post('/validate')
   @ApiMessage('Identidad verificada con éxito')
-  async postValidateAccount(
+  async postValidateIdentity(
     @Res({ passthrough: true }) res: Response,
     @Body() validateIdentityDto: ValidateIdentityDto,
   ) {
     const { refreshToken, token } =
-      await this.validateAccountUseCase.run(validateIdentityDto);
+      await this.validateIdentityUseCase.run(validateIdentityDto);
 
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
@@ -93,5 +95,30 @@ export class AuthController {
     });
 
     return undefined;
+  }
+
+  @Post('/refresh')
+  @ApiMessage('Sesión actualizada con éxito')
+  async postRefreshSession(
+    @Res({ passthrough: true }) res: Response,
+    @BearerToken() oldToken: string,
+    @Cookie() oldRefreshToken: string,
+    @GetAccount('accountId', ParseUUIDPipe) accountId: string,
+  ) {
+    const { token, refreshToken } = await this.refreshSessionUseCase.run(
+      accountId,
+      oldToken,
+      oldRefreshToken,
+    );
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 1 semana
+    });
+
+    return { token, refreshToken };
   }
 }

@@ -8,6 +8,7 @@ import {
   CreateAccountUseCase,
   LoginUseCase,
   LogoutUseCase,
+  RefreshSessionUseCase,
   ResendCodeUseCase,
   ValidateIdentityUseCase,
 } from '../../application/use-cases';
@@ -47,6 +48,10 @@ describe('AuthController', () => {
     run: jest.fn(),
   } satisfies Pick<LogoutUseCase, 'run'>;
 
+  const refreshSessionUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<RefreshSessionUseCase, 'run'>;
+
   /** Mock de Response de Express para simular el manejo de cookies */
   const mockRes = {
     cookie: jest.fn(),
@@ -76,6 +81,10 @@ describe('AuthController', () => {
         {
           provide: LogoutUseCase,
           useValue: logoutUseCase,
+        },
+        {
+          provide: RefreshSessionUseCase,
+          useValue: refreshSessionUseCase,
         },
       ],
     }).compile();
@@ -113,7 +122,7 @@ describe('AuthController', () => {
     });
   });
 
-  describe('postValidateAccount', () => {
+  describe('postValidateIdentity', () => {
     it('debe delegar los datos al ValidateIdentityUseCase, setear la cookie y retornar los tokens', async () => {
       // Arrange
       const dto: ValidateIdentityDto = {
@@ -129,7 +138,7 @@ describe('AuthController', () => {
       validateIdentityUseCase.run.mockResolvedValue(expectedResult);
 
       // Act
-      const result = await controller.postValidateAccount(mockRes, dto);
+      const result = await controller.postValidateIdentity(mockRes, dto);
 
       // Assert
       expect(validateIdentityUseCase.run).toHaveBeenCalledTimes(1);
@@ -228,6 +237,52 @@ describe('AuthController', () => {
       );
 
       expect(result).toBe(expectedResult);
+    });
+  });
+
+  describe('postRefreshSession', () => {
+    it('debe delegar los datos al RefreshSessionUseCase, setear la cookie y retornar los tokens', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+      const oldToken = 'old-test-token';
+      const oldRefreshToken = 'old-test-refresh-token';
+
+      const expectedResult = {
+        token: 'test-token',
+        refreshToken: 'test-refresh-token',
+      };
+
+      refreshSessionUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.postRefreshSession(
+        mockRes,
+        oldToken,
+        oldRefreshToken,
+        accountId,
+      );
+
+      // Assert
+      expect(refreshSessionUseCase.run).toHaveBeenCalledTimes(1);
+      expect(refreshSessionUseCase.run).toHaveBeenCalledWith(
+        accountId,
+        oldToken,
+        oldRefreshToken,
+      );
+
+      expect(mockRes.cookie).toHaveBeenCalledTimes(1);
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        expectedResult.refreshToken,
+        expect.objectContaining({
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          path: '/',
+        }),
+      );
+
+      expect(result).toEqual(expectedResult);
     });
   });
 });
