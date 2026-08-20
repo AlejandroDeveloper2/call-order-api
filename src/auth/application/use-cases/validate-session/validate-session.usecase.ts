@@ -12,7 +12,10 @@ import {
 import { JwtPayload } from '../../../../shared/domain/types';
 
 /** Errores */
-import { AppError } from '../../../../shared/domain/exceptions';
+import {
+  AppError,
+  SHARED_ERROR_CODES,
+} from '../../../../shared/domain/exceptions';
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 @Injectable()
@@ -35,7 +38,7 @@ export class ValidateSessionUseCase {
       });
     } catch {
       throw new AppError(
-        AUTH_ERROR_CODES.invalidSession,
+        SHARED_ERROR_CODES.invalidToken,
         401,
         'Token de sesión inválido',
         true,

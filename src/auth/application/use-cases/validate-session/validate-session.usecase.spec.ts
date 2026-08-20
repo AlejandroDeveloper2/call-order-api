@@ -14,6 +14,7 @@ import {
 import { JwtPayload } from '../../../../shared/domain/types';
 /** Errores */
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { SHARED_ERROR_CODES } from '../../../../shared/domain/exceptions';
 
 /** Caso de uso */
 import { ValidateSessionUseCase } from './validate-session.usecase';
@@ -95,7 +96,7 @@ describe('ValidateSessionUsecase', () => {
 
       // Assert
       await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidSession,
+        name: SHARED_ERROR_CODES.invalidToken,
         httpCode: 401,
       });
     });
