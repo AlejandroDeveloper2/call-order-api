@@ -1,4 +1,11 @@
-import { Body, Controller, ParseUUIDPipe, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  ParseUUIDPipe,
+  Post,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 
 /** Casos de uso */
@@ -9,6 +16,7 @@ import {
   RefreshSessionUseCase,
   ResendCodeUseCase,
   ValidateIdentityUseCase,
+  ValidateSessionUseCase,
 } from '../../application/use-cases';
 
 /** Dtos */
@@ -37,6 +45,7 @@ export class AuthController {
     private readonly resendCodeUseCase: ResendCodeUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly refreshSessionUseCase: RefreshSessionUseCase,
+    private readonly validateSessionUseCase: ValidateSessionUseCase,
   ) {}
 
   @Post('/login')
@@ -120,5 +129,14 @@ export class AuthController {
     });
 
     return { token, refreshToken };
+  }
+
+  @Get('/validate/session')
+  @ApiMessage('Sesión verificada con éxito')
+  async getValidateSession(
+    @BearerToken() token: string,
+    @GetAccount('accountId', ParseUUIDPipe) accountId: string,
+  ) {
+    return this.validateSessionUseCase.run(accountId, token);
   }
 }

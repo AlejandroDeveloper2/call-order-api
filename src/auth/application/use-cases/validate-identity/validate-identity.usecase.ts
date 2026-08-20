@@ -39,7 +39,7 @@ export class ValidateIdentityUseCase {
     private readonly sessionRepository: SessionRepositoryPort,
     @Inject(TRANSACTION_MANAGER)
     private readonly transactionManager: TransactionManagerPort,
-  ) { }
+  ) {}
 
   async run(
     validateAccountDto: ValidateIdentityDto,

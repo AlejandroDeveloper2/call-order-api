@@ -11,6 +11,7 @@ import {
   RefreshSessionUseCase,
   ResendCodeUseCase,
   ValidateIdentityUseCase,
+  ValidateSessionUseCase,
 } from '../../application/use-cases';
 
 /** DTOs */
@@ -52,6 +53,10 @@ describe('AuthController', () => {
     run: jest.fn(),
   } satisfies Pick<RefreshSessionUseCase, 'run'>;
 
+  const validateSessionUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<ValidateSessionUseCase, 'run'>;
+
   /** Mock de Response de Express para simular el manejo de cookies */
   const mockRes = {
     cookie: jest.fn(),
@@ -85,6 +90,10 @@ describe('AuthController', () => {
         {
           provide: RefreshSessionUseCase,
           useValue: refreshSessionUseCase,
+        },
+        {
+          provide: ValidateSessionUseCase,
+          useValue: validateSessionUseCase,
         },
       ],
     }).compile();
@@ -282,6 +291,31 @@ describe('AuthController', () => {
         }),
       );
 
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('getValidateSession', () => {
+    it('debe delegar los datos al ValidateSessionUseCase y retornar su resultado', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+      const token = 'test-token';
+
+      const expectedResult = {
+        token: 'test-token',
+        accountId: 'test-account-id',
+        profileId: 'test-profile-id',
+        roleId: 'test-role-id',
+      };
+
+      validateSessionUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.getValidateSession(token, accountId);
+
+      // Assert
+      expect(validateSessionUseCase.run).toHaveBeenCalledTimes(1);
+      expect(validateSessionUseCase.run).toHaveBeenCalledWith(accountId, token);
       expect(result).toEqual(expectedResult);
     });
   });

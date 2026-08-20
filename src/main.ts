@@ -1,8 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationError } from 'class-validator';
 import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
+import { AppError } from './shared/domain/exceptions';
+import { SHARED_ERROR_CODES } from './shared/domain/exceptions';
 
 async function bootstrap() {
   console.log('🚀 [1] Iniciando bootstrap...');
@@ -31,6 +34,18 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors: ValidationError[]) => {
+        const messages = errors
+          .flatMap((error) => Object.values(error.constraints ?? {}))
+          .join('; ');
+
+        return new AppError(
+          SHARED_ERROR_CODES.validationError,
+          400,
+          messages || 'Error de validación',
+          true,
+        );
+      },
     }),
   );
 

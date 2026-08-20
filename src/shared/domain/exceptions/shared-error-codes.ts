@@ -9,4 +9,5 @@ export const SHARED_ERROR_CODES = {
   refreshNotProvided: 'REFRESH_NOT_PROVIDED',
   missingToken: 'MISSING_TOKEN',
   invalidToken: 'INVALID_TOKEN',
+  tokenExpired: 'TOKEN_EXPIRED',
 };
