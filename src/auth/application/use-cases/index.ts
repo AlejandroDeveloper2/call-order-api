@@ -7,3 +7,4 @@ export * from './refresh-session/refresh-session.usecase';
 export * from './validate-session/validate-session.usecase';
 export * from './update-email/update-email.usecase';
 export * from './change-password/change-password.usecase';
+export * from './update-password/update-password.usecase';

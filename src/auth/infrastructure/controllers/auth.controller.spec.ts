@@ -15,6 +15,7 @@ import {
   ValidateIdentityUseCase,
   ValidateSessionUseCase,
   ChangePasswordUseCase,
+  UpdatePasswordUseCase,
 } from '../../application/use-cases';
 
 /** DTOs */
@@ -25,6 +26,7 @@ import {
   ResendCodeDto,
   UpdateEmailDto,
   ValidateIdentityDto,
+  UpdatePasswordDto,
 } from '../../application/dto';
 
 jest.mock('uuid', () => ({
@@ -69,6 +71,10 @@ describe('AuthController', () => {
   const changePasswordUseCase = {
     run: jest.fn(),
   } satisfies Pick<ChangePasswordUseCase, 'run'>;
+
+  const updatePasswordUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<UpdatePasswordUseCase, 'run'>;
 
   /** Mock de Response de Express para simular el manejo de cookies */
   const mockRes = {
@@ -115,6 +121,10 @@ describe('AuthController', () => {
         {
           provide: ChangePasswordUseCase,
           useValue: changePasswordUseCase,
+        },
+        {
+          provide: UpdatePasswordUseCase,
+          useValue: updatePasswordUseCase,
         },
       ],
     }).compile();
@@ -390,6 +400,34 @@ describe('AuthController', () => {
       expect(changePasswordUseCase.run).toHaveBeenCalledWith(
         accountId,
         changePasswordDto,
+      );
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('patchUpdatePassword', () => {
+    it('debe delegar los datos al UpdatePasswordUseCase y retornar su resultado', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+      const updatePasswordDto: UpdatePasswordDto = {
+        newPassword: 'new-password',
+      };
+
+      const expectedResult = undefined;
+
+      updatePasswordUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.patchUpdatePassword(
+        accountId,
+        updatePasswordDto,
+      );
+
+      // Assert
+      expect(updatePasswordUseCase.run).toHaveBeenCalledTimes(1);
+      expect(updatePasswordUseCase.run).toHaveBeenCalledWith(
+        accountId,
+        updatePasswordDto,
       );
       expect(result).toEqual(expectedResult);
     });

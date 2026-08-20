@@ -18,6 +18,7 @@ import {
   RefreshSessionUseCase,
   ResendCodeUseCase,
   UpdateEmailUseCase,
+  UpdatePasswordUseCase,
   ValidateIdentityUseCase,
   ValidateSessionUseCase,
 } from '../../application/use-cases';
@@ -29,6 +30,7 @@ import {
   LoginDto,
   ResendCodeDto,
   UpdateEmailDto,
+  UpdatePasswordDto,
   ValidateIdentityDto,
 } from '../../application/dto';
 
@@ -53,6 +55,7 @@ export class AuthController {
     private readonly validateSessionUseCase: ValidateSessionUseCase,
     private readonly updateEmailUseCase: UpdateEmailUseCase,
     private readonly changePasswordUseCase: ChangePasswordUseCase,
+    private readonly updatePasswordUseCase: UpdatePasswordUseCase,
   ) {}
 
   @Post('/login')
@@ -164,5 +167,14 @@ export class AuthController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.changePasswordUseCase.run(accountId, changePasswordDto);
+  }
+  @Patch('/update/password')
+  @Auth('auth:update:password')
+  @ApiMessage('Contraseña fue actualizada con éxito')
+  patchUpdatePassword(
+    @GetAccount('accountId') accountId: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ) {
+    return this.updatePasswordUseCase.run(accountId, updatePasswordDto);
   }
 }
