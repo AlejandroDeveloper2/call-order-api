@@ -14,10 +14,12 @@ import {
   UpdateEmailUseCase,
   ValidateIdentityUseCase,
   ValidateSessionUseCase,
+  ChangePasswordUseCase,
 } from '../../application/use-cases';
 
 /** DTOs */
 import {
+  ChangePasswordDto,
   CreateAccountDto,
   LoginDto,
   ResendCodeDto,
@@ -64,6 +66,10 @@ describe('AuthController', () => {
     run: jest.fn(),
   } satisfies Pick<UpdateEmailUseCase, 'run'>;
 
+  const changePasswordUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<ChangePasswordUseCase, 'run'>;
+
   /** Mock de Response de Express para simular el manejo de cookies */
   const mockRes = {
     cookie: jest.fn(),
@@ -105,6 +111,10 @@ describe('AuthController', () => {
         {
           provide: UpdateEmailUseCase,
           useValue: updateEmailUseCase,
+        },
+        {
+          provide: ChangePasswordUseCase,
+          useValue: changePasswordUseCase,
         },
       ],
     }).compile();
@@ -351,6 +361,35 @@ describe('AuthController', () => {
       expect(updateEmailUseCase.run).toHaveBeenCalledWith(
         accountId,
         updateEmailDto,
+      );
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('patchChangePassword', () => {
+    it('debe delegar los datos al ChangePasswordUseCase y retornar su resultado', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+      const changePasswordDto: ChangePasswordDto = {
+        currentPassword: 'current-password',
+        newPassword: 'new-password',
+      };
+
+      const expectedResult = undefined;
+
+      changePasswordUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.patchChangePassword(
+        accountId,
+        changePasswordDto,
+      );
+
+      // Assert
+      expect(changePasswordUseCase.run).toHaveBeenCalledTimes(1);
+      expect(changePasswordUseCase.run).toHaveBeenCalledWith(
+        accountId,
+        changePasswordDto,
       );
       expect(result).toEqual(expectedResult);
     });

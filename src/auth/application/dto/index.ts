@@ -3,3 +3,4 @@ export * from './validate-identity.dto';
 export * from './create-account.dto';
 export * from './resend-code.dto';
 export * from './update-email.dto';
+export * from './change-password.dto';

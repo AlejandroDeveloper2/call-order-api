@@ -198,9 +198,9 @@ describe('RefreshSessionUseCase', () => {
 
       expect(sessionRepository.update).toHaveBeenCalledWith('test-session-id', {
         tokenHash: 'new-token-hash',
-        refreshTokenHash: expect.any(String),
-        lastActivityAt: expect.any(Date),
-        expiresAt: expect.any(Date),
+        refreshTokenHash: expect.any(String) as string,
+        lastActivityAt: expect.any(Date) as Date,
+        expiresAt: expect.any(Date) as Date,
       });
     });
   });

@@ -15,7 +15,11 @@ import {
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
-import { TRANSACTION_MANAGER, TransactionContext, TransactionManagerPort } from '../../../../shared/domain/ports';
+import {
+  TRANSACTION_MANAGER,
+  TransactionContext,
+  TransactionManagerPort,
+} from '../../../../shared/domain/ports';
 
 /** Errores */
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
@@ -295,7 +299,6 @@ describe('ValidateIdentityUseCase', () => {
         }),
         transactionContext,
       );
-
     });
   });
 });

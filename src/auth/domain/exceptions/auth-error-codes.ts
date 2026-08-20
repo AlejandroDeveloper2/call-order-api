@@ -11,4 +11,5 @@ export const AUTH_ERROR_CODES = {
   codeNotExpiredYet: 'CODE_NOT_EXPIRED_YET',
   accountAlreadyExists: 'ACCOUNT_ALREADY_EXISTS',
   accountNotFound: 'ACCOUNT_NOT_FOUND',
+  incorrectPassword: 'INCORRECT_PASSWORD',
 };

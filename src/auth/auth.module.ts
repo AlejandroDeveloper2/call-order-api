@@ -21,6 +21,7 @@ import {
   RefreshSessionUseCase,
   ValidateSessionUseCase,
   UpdateEmailUseCase,
+  ChangePasswordUseCase,
 } from './application/use-cases';
 
 /** Controladores */
@@ -79,6 +80,7 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
     RefreshSessionUseCase,
     ValidateSessionUseCase,
     UpdateEmailUseCase,
+    ChangePasswordUseCase,
     { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
     { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
     {

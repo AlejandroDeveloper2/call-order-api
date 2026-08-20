@@ -11,6 +11,7 @@ import type { Response } from 'express';
 
 /** Casos de uso */
 import {
+  ChangePasswordUseCase,
   CreateAccountUseCase,
   LoginUseCase,
   LogoutUseCase,
@@ -23,6 +24,7 @@ import {
 
 /** Dtos */
 import {
+  ChangePasswordDto,
   CreateAccountDto,
   LoginDto,
   ResendCodeDto,
@@ -50,6 +52,7 @@ export class AuthController {
     private readonly refreshSessionUseCase: RefreshSessionUseCase,
     private readonly validateSessionUseCase: ValidateSessionUseCase,
     private readonly updateEmailUseCase: UpdateEmailUseCase,
+    private readonly changePasswordUseCase: ChangePasswordUseCase,
   ) {}
 
   @Post('/login')
@@ -137,7 +140,7 @@ export class AuthController {
 
   @Get('/validate/session')
   @ApiMessage('Sesión verificada con éxito')
-  async getValidateSession(
+  getValidateSession(
     @BearerToken() token: string,
     @GetAccount('accountId', ParseUUIDPipe) accountId: string,
   ) {
@@ -147,10 +150,19 @@ export class AuthController {
   @Patch('/update/email')
   @Auth('auth:update:email')
   @ApiMessage('Correo electrónico actualizado con éxito')
-  async patchEmail(
+  patchEmail(
     @GetAccount('accountId') accountId: string,
     @Body() updateEmailDto: UpdateEmailDto,
   ) {
     return this.updateEmailUseCase.run(accountId, updateEmailDto);
+  }
+  @Patch('/change/password')
+  @Auth('auth:change:password')
+  @ApiMessage('Contraseña fue cambiada con éxito')
+  patchChangePassword(
+    @GetAccount('accountId') accountId: string,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.changePasswordUseCase.run(accountId, changePasswordDto);
   }
 }

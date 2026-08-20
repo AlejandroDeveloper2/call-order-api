@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
+import { addDays } from 'date-fns';
 
 /** Entidades */
 import { Session } from '../../../domain/entities';
@@ -15,7 +16,6 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 /** Casos de uso */
 import { LogoutUseCase } from './logout.usecase';
-import { addDays, addMinutes } from 'date-fns';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -117,7 +117,7 @@ describe('LogoutUseCase', () => {
       expect(mockSessionRepository.update).toHaveBeenCalledWith(
         'session-test-id',
         {
-          revokedAt: expect.any(Date),
+          revokedAt: expect.any(Date) as Date,
         },
       );
       expect(jest.mocked(bcrypt.compare)).toHaveBeenCalledWith(
