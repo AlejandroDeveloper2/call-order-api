@@ -61,7 +61,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (err || !user) {
       throw (
-        err ??
+        (err as Error) ??
         new AppError(
           SHARED_ERROR_CODES.invalidToken,
           401,
