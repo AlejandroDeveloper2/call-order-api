@@ -11,6 +11,7 @@ import {
   LogoutUseCase,
   RefreshSessionUseCase,
   ResendCodeUseCase,
+  UpdateEmailUseCase,
   ValidateIdentityUseCase,
   ValidateSessionUseCase,
 } from '../../application/use-cases';
@@ -20,6 +21,7 @@ import {
   CreateAccountDto,
   LoginDto,
   ResendCodeDto,
+  UpdateEmailDto,
   ValidateIdentityDto,
 } from '../../application/dto';
 
@@ -58,6 +60,10 @@ describe('AuthController', () => {
     run: jest.fn(),
   } satisfies Pick<ValidateSessionUseCase, 'run'>;
 
+  const updateEmailUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<UpdateEmailUseCase, 'run'>;
+
   /** Mock de Response de Express para simular el manejo de cookies */
   const mockRes = {
     cookie: jest.fn(),
@@ -95,6 +101,10 @@ describe('AuthController', () => {
         {
           provide: ValidateSessionUseCase,
           useValue: validateSessionUseCase,
+        },
+        {
+          provide: UpdateEmailUseCase,
+          useValue: updateEmailUseCase,
         },
       ],
     }).compile();
@@ -317,6 +327,31 @@ describe('AuthController', () => {
       // Assert
       expect(validateSessionUseCase.run).toHaveBeenCalledTimes(1);
       expect(validateSessionUseCase.run).toHaveBeenCalledWith(accountId, token);
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('patchEmail', () => {
+    it('debe delegar los datos al UpdateEmailUseCase y retornar su resultado', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+      const updateEmailDto: UpdateEmailDto = {
+        updatedEmail: 'nuevo_correo@gmail.com',
+      };
+
+      const expectedResult = undefined;
+
+      updateEmailUseCase.run.mockResolvedValue(expectedResult);
+
+      // Act
+      const result = await controller.patchEmail(accountId, updateEmailDto);
+
+      // Assert
+      expect(updateEmailUseCase.run).toHaveBeenCalledTimes(1);
+      expect(updateEmailUseCase.run).toHaveBeenCalledWith(
+        accountId,
+        updateEmailDto,
+      );
       expect(result).toEqual(expectedResult);
     });
   });

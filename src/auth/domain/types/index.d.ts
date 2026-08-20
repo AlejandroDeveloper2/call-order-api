@@ -6,6 +6,7 @@ interface UpdateAccountMetaInput {
   lockedUtil?: Date;
   email?: string;
   passwordHash?: string;
+  mustChangePassword?: boolean;
 }
 
 interface UpdateCodeInput {

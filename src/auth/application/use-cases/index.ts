@@ -5,3 +5,4 @@ export * from './resend-code/resend-code.usecase';
 export * from './logout/logout.usecase';
 export * from './refresh-session/refresh-session.usecase';
 export * from './validate-session/validate-session.usecase';
+export * from './update-email/update-email.usecase';

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   ParseUUIDPipe,
+  Patch,
   Post,
   Res,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
   LogoutUseCase,
   RefreshSessionUseCase,
   ResendCodeUseCase,
+  UpdateEmailUseCase,
   ValidateIdentityUseCase,
   ValidateSessionUseCase,
 } from '../../application/use-cases';
@@ -24,6 +26,7 @@ import {
   CreateAccountDto,
   LoginDto,
   ResendCodeDto,
+  UpdateEmailDto,
   ValidateIdentityDto,
 } from '../../application/dto';
 
@@ -46,6 +49,7 @@ export class AuthController {
     private readonly logoutUseCase: LogoutUseCase,
     private readonly refreshSessionUseCase: RefreshSessionUseCase,
     private readonly validateSessionUseCase: ValidateSessionUseCase,
+    private readonly updateEmailUseCase: UpdateEmailUseCase,
   ) {}
 
   @Post('/login')
@@ -138,5 +142,15 @@ export class AuthController {
     @GetAccount('accountId', ParseUUIDPipe) accountId: string,
   ) {
     return this.validateSessionUseCase.run(accountId, token);
+  }
+
+  @Patch('/update/email')
+  @Auth('auth:update:email')
+  @ApiMessage('Correo electrónico actualizado con éxito')
+  async patchEmail(
+    @GetAccount('accountId') accountId: string,
+    @Body() updateEmailDto: UpdateEmailDto,
+  ) {
+    return this.updateEmailUseCase.run(accountId, updateEmailDto);
   }
 }
