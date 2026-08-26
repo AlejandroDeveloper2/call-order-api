@@ -1,5 +1,5 @@
 /** Puertos */
-import { EncryptorPort, SessionRepositoryPort } from '../../../domain/ports';
+import { SessionRepositoryPort, TokenHasherPort } from '../../../domain/ports';
 
 /** Errores */
 import { InvalidSessionException } from '../../exceptions';
@@ -10,7 +10,7 @@ import { JwtAccessToken } from '../../../domain/value-objects';
 export class LogoutUseCase {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
-    private readonly encryptor: EncryptorPort,
+    private readonly tokenHasher: TokenHasherPort,
   ) {}
 
   async run(accountId: string, token: string): Promise<void> {
@@ -24,7 +24,7 @@ export class LogoutUseCase {
     if (!session) throw new InvalidSessionException('Sesión invalida');
 
     /** Comparar el hash del token para filtrar la sesión actual */
-    const isValid = await this.encryptor.compare(tokenValue, session.tokenHash);
+    const isValid = this.tokenHasher.compare(tokenValue, session.tokenHash);
 
     /** Validar si la sesión es valida */
     if (!isValid) throw new InvalidSessionException('Sesión invalida');

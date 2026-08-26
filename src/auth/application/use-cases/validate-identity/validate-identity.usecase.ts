@@ -7,9 +7,9 @@ import { Session } from '../../../domain/entities';
 import {
   AccessTokenGeneratorPort,
   AccountRepositoryPort,
-  EncryptorPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
+  TokenHasherPort,
   VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
@@ -43,7 +43,7 @@ export class ValidateIdentityUseCase {
     private readonly sessionRepository: SessionRepositoryPort,
     private readonly transactionManager: TransactionManagerPort,
     private readonly idGenerator: IdGeneratorPort,
-    private readonly encryptor: EncryptorPort,
+    private readonly tokenHasher: TokenHasherPort,
     private readonly accessTokenGenerator: AccessTokenGeneratorPort,
     private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
     private readonly verificationCodeLookup: VerificationCodeLookupPort,
@@ -70,7 +70,7 @@ export class ValidateIdentityUseCase {
       throw new InvalidCodeException('Código de verificación invalido');
 
     /** Comparar el hash del código para filtrar el código de verificación actual */
-    const isValid = await this.encryptor.compare(
+    const isValid = this.tokenHasher.compare(
       codeValue,
       verificationCode.codeHash,
     );
@@ -122,8 +122,8 @@ export class ValidateIdentityUseCase {
     const refreshTokenValue = RefreshToken.create(refreshToken).toString();
 
     /** Encriptar ambos token para agregar una capa solida de seguridad */
-    const tokenHash = await this.encryptor.hash(tokenValue, 12);
-    const refreshTokenHash = await this.encryptor.hash(refreshTokenValue, 12);
+    const tokenHash = this.tokenHasher.hash(tokenValue);
+    const refreshTokenHash = this.tokenHasher.hash(refreshTokenValue);
 
     /** Invalidar las sesiones activas anteriores de la misma cuenta en una sola consulta */
     await this.sessionRepository.revokeByAccountId(

@@ -4,9 +4,9 @@ import { addDays } from 'date-fns';
 import {
   AccessTokenGeneratorPort,
   AccessTokenVerifierPort,
-  EncryptorPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
+  TokenHasherPort,
 } from '../../../domain/ports';
 
 /** Errores */
@@ -18,7 +18,7 @@ import { JwtAccessToken, RefreshToken } from '../../../domain/value-objects';
 export class RefreshSessionUseCase {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
-    private readonly encryptor: EncryptorPort,
+    private readonly tokenHasher: TokenHasherPort,
     private readonly accessTokenGenerator: AccessTokenGeneratorPort,
     private readonly accessTokenVerifier: AccessTokenVerifierPort,
     private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
@@ -39,13 +39,13 @@ export class RefreshSessionUseCase {
     if (!session) throw new InvalidSessionException('Sesión invalida');
 
     /** Comparar el hash del token para filtrar la sesión actual */
-    const isValid = await this.encryptor.compare(tokenValue, session.tokenHash);
+    const isValid = this.tokenHasher.compare(tokenValue, session.tokenHash);
 
     /** Validar si la sesión es valida */
     if (!isValid) throw new InvalidSessionException('Sesión invalida');
 
     /** Validar si el refresh token es valido */
-    const isValidRefreshToken = await this.encryptor.compare(
+    const isValidRefreshToken = this.tokenHasher.compare(
       refreshTokenValue,
       session.refreshTokenHash,
     );
@@ -74,11 +74,9 @@ export class RefreshSessionUseCase {
       RefreshToken.create(newRefreshToken).toString();
 
     /** Encriptar el nuevo token y refresh token */
-    const newTokenHash: string = await this.encryptor.hash(newTokenValue, 12);
-    const newRefreshTokenHash: string = await this.encryptor.hash(
-      newRefreshTokenValue,
-      12,
-    );
+    const newTokenHash: string = this.tokenHasher.hash(newTokenValue);
+    const newRefreshTokenHash: string =
+      this.tokenHasher.hash(newRefreshTokenValue);
 
     /** Actualizar la sesión con el nuevo token, refresh token , última actividad y tiempo de expiración */
     await this.sessionRepository.refresh(session.sessionId, {

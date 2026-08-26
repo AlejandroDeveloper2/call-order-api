@@ -6,6 +6,7 @@ import {
   ACCESS_TOKEN_VERIFIER,
   REFRESH_TOKEN_GENERATOR,
   VERIFICATION_CODE_LOOK_UP,
+  TOKEN_HASHER,
 } from '../../domain/ports';
 
 import {
@@ -14,6 +15,7 @@ import {
   JwtAccessTokenVerifierAdapter,
   CryptoRefreshTokenGeneratorAdapter,
   HmacVerificationCodeLookupAdapter,
+  NodeTokenHasherAdapter,
 } from '../security';
 import { ConfigService } from '@nestjs/config';
 
@@ -47,5 +49,9 @@ export const AUTH_SECURITY_PROVIDERS: Provider[] = [
       return new HmacVerificationCodeLookupAdapter(secret);
     },
     inject: [ConfigService],
+  },
+  {
+    provide: TOKEN_HASHER,
+    useClass: NodeTokenHasherAdapter,
   },
 ];

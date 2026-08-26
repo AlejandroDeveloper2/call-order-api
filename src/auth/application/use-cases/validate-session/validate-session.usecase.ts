@@ -1,8 +1,8 @@
 /** Puertos */
 import {
   AccessTokenVerifierPort,
-  EncryptorPort,
   SessionRepositoryPort,
+  TokenHasherPort,
 } from '../../../domain/ports';
 
 /** Tipos */
@@ -14,7 +14,7 @@ import { InvalidSessionException } from '../../exceptions';
 export class ValidateSessionUseCase {
   constructor(
     private readonly sessionRepository: SessionRepositoryPort,
-    private readonly encryptor: EncryptorPort,
+    private readonly tokenHasher: TokenHasherPort,
     private readonly accessTokenVerifier: AccessTokenVerifierPort,
   ) {}
 
@@ -38,7 +38,7 @@ export class ValidateSessionUseCase {
 
     /** Comparar el hash del token para filtrar la sesión actual */
 
-    const isValid = await this.encryptor.compare(token, session.tokenHash);
+    const isValid = this.tokenHasher.compare(token, session.tokenHash);
 
     /** Validar si la sesión es valida */
     if (!isValid) throw new InvalidSessionException('Sesión invalida');

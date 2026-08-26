@@ -30,6 +30,8 @@ import {
   RefreshTokenGeneratorPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
+  TOKEN_HASHER,
+  TokenHasherPort,
   VERIFICATION_CODE_LOOK_UP,
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeLookupPort,
@@ -137,26 +139,26 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
 
     useFactory: (
       sessionRepository: SessionRepositoryPort,
-      encryptor: EncryptorPort,
+      tokenHasher: TokenHasherPort,
     ) => {
-      return new LogoutUseCase(sessionRepository, encryptor);
+      return new LogoutUseCase(sessionRepository, tokenHasher);
     },
 
-    inject: [SESSION_REPOSITORY, ENCRYPTOR],
+    inject: [SESSION_REPOSITORY, TOKEN_HASHER],
   },
   {
     provide: RefreshSessionUseCase,
 
     useFactory: (
       sessionRepository: SessionRepositoryPort,
-      encryptor: EncryptorPort,
+      tokenHasher: TokenHasherPort,
       accessTokenGenerator: AccessTokenGeneratorPort,
       accessTokenVerifier: AccessTokenVerifierPort,
       refreshTokenGenerator: RefreshTokenGeneratorPort,
     ) => {
       return new RefreshSessionUseCase(
         sessionRepository,
-        encryptor,
+        tokenHasher,
         accessTokenGenerator,
         accessTokenVerifier,
         refreshTokenGenerator,
@@ -165,7 +167,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
 
     inject: [
       SESSION_REPOSITORY,
-      ENCRYPTOR,
+      TOKEN_HASHER,
       ACCESS_TOKEN_GENERATOR,
       ACCESS_TOKEN_VERIFIER,
       REFRESH_TOKEN_GENERATOR,
@@ -229,7 +231,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       sessionRepository: SessionRepositoryPort,
       transactionManager: TransactionManagerPort,
       idGenerator: IdGeneratorPort,
-      encryptor: EncryptorPort,
+      tokenHasher: TokenHasherPort,
       accessTokenGenerator: AccessTokenGeneratorPort,
       refreshTokenGenerator: RefreshTokenGeneratorPort,
       verificationCodeLookup: VerificationCodeLookupPort,
@@ -240,7 +242,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
         sessionRepository,
         transactionManager,
         idGenerator,
-        encryptor,
+        tokenHasher,
         accessTokenGenerator,
         refreshTokenGenerator,
         verificationCodeLookup,
@@ -253,7 +255,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       SESSION_REPOSITORY,
       TRANSACTION_MANAGER,
       ID_GENERATOR_KEY,
-      ENCRYPTOR,
+      TOKEN_HASHER,
       ACCESS_TOKEN_GENERATOR,
       REFRESH_TOKEN_GENERATOR,
       VERIFICATION_CODE_LOOK_UP,
@@ -265,17 +267,17 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
 
     useFactory: (
       sessionRepository: SessionRepositoryPort,
-      encryptor: EncryptorPort,
+      tokenHasher: TokenHasherPort,
       accessTokenVerifier: AccessTokenVerifierPort,
     ) => {
       return new ValidateSessionUseCase(
         sessionRepository,
-        encryptor,
+        tokenHasher,
         accessTokenVerifier,
       );
     },
 
-    inject: [SESSION_REPOSITORY, ENCRYPTOR, ACCESS_TOKEN_VERIFIER],
+    inject: [SESSION_REPOSITORY, TOKEN_HASHER, ACCESS_TOKEN_VERIFIER],
   },
   {
     provide: ValidateAccessTokenUseCase,
