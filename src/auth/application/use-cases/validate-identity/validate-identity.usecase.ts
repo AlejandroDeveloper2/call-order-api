@@ -96,8 +96,8 @@ export class ValidateIdentityUseCase {
 
     /** Comparar el hash del código para filtrar el código de verificación actual */
     const validCode = await this.validateVerificationCode(
-      verificationCode,
       email,
+      verificationCode,
     );
 
     /** Validar si el código ha expirado */

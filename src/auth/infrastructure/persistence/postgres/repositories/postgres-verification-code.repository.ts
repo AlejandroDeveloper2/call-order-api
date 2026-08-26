@@ -42,7 +42,7 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
       const results = await this.repository
         .createQueryBuilder('code')
         .innerJoin('code.account', 'account')
-        .innerJoin('code.account.profile', 'profile')
+        .innerJoin('account.profile', 'profile')
         .select([
           'code.id',
           'code.codeHash',
@@ -83,7 +83,7 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
       const results = await this.repository
         .createQueryBuilder('code')
         .innerJoin('code.account', 'account')
-        .innerJoin('code.account.profile', 'profile')
+        .innerJoin('account.profile', 'profile')
         .select([
           'code.id',
           'code.codeHash',
