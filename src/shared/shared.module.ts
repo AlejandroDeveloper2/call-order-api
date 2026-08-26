@@ -10,7 +10,11 @@ import {
 
 import { CloudinaryUploadInterceptor } from './infrastructure/interceptors';
 
-import { EMAIL_SENDER_KEY, TRANSACTION_MANAGER } from './domain/ports';
+import {
+  EMAIL_SENDER_KEY,
+  ID_GENERATOR_KEY,
+  TRANSACTION_MANAGER,
+} from './domain/ports';
 
 @Module({
   imports: [ConfigModule],
@@ -22,7 +26,10 @@ import { EMAIL_SENDER_KEY, TRANSACTION_MANAGER } from './domain/ports';
     },
     CloudinaryAdpater,
     CloudinaryUploadInterceptor,
-    UUIDAdapter,
+    {
+      provide: ID_GENERATOR_KEY,
+      useClass: UUIDAdapter,
+    },
   ],
   exports: [
     { provide: EMAIL_SENDER_KEY, useClass: NodeMailerAdapter },
@@ -32,7 +39,7 @@ import { EMAIL_SENDER_KEY, TRANSACTION_MANAGER } from './domain/ports';
     },
     CloudinaryAdpater,
     CloudinaryUploadInterceptor,
-    UUIDAdapter,
+    ID_GENERATOR_KEY,
   ],
 })
 export class SharedModule {}

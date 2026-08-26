@@ -31,4 +31,6 @@ export abstract class VerificationCodeRepositoryPort {
   ): Promise<number>;
 }
 
-export const VERIFICATION_CODE_REPOSITORY = 'VERIFICATION_CODE_REPOSITORY';
+export const VERIFICATION_CODE_REPOSITORY = Symbol(
+  'VERIFICATION_CODE_REPOSITORY',
+);

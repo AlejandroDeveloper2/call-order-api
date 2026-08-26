@@ -1,26 +1,20 @@
-import { Inject, Injectable } from '@nestjs/common';
-
 /** Puertos */
-import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
+import { UserRepositoryPort } from '../../../domain/ports';
+
 /** Excepciones de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
+import { UserNotFoundException } from '../../exceptions';
 
-/** Dtos */
-import { UpdateUserStatusDto } from '../../dto';
+/** Commands */
+import { UpdateUserStatusCommand } from '../../commands';
 
-@Injectable()
 export class UpdateUserStatusUseCase {
-  constructor(
-    @Inject(USER_REPOSITORY)
-    private readonly userRepository: UserRepositoryPort,
-  ) {}
+  constructor(private readonly userRepository: UserRepositoryPort) {}
 
   async run(
     userId: string,
-    updateUserStatusDto: UpdateUserStatusDto,
+    updateUserStatusCommand: UpdateUserStatusCommand,
   ): Promise<void> {
-    const { status } = updateUserStatusDto;
+    const { status } = updateUserStatusCommand;
     let affectedRows: number = 0;
 
     affectedRows =
@@ -29,11 +23,8 @@ export class UpdateUserStatusUseCase {
         : await this.userRepository.deactivate(userId);
 
     if (affectedRows === 0)
-      throw new AppError(
-        USER_ERROR_CODES.userNotFound,
-        404,
+      throw new UserNotFoundException(
         'El ID no pertenece a ningun usuario registrado',
-        true,
       );
   }
 }

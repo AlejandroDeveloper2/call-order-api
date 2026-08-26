@@ -34,7 +34,7 @@ export class PostgresVerificationCodeSchema {
   @Column({ enum: ['double-factor'], default: 'double-factor' })
   type!: VerificationCodeType;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz', nullable: false })
   expiresAt!: Date;
 
   @Column({ default: 0 })

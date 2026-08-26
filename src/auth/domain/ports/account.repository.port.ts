@@ -61,4 +61,4 @@ export abstract class AccountRepositoryPort {
   ): Promise<number>;
 }
 
-export const ACCOUNT_REPOSITORY = 'ACCOUNT_REPOSITORY';
+export const ACCOUNT_REPOSITORY = Symbol('ACCOUNT_REPOSITORY');

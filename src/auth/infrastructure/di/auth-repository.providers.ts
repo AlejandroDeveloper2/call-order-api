@@ -1,9 +1,9 @@
 import { Provider } from '@nestjs/common';
 
 import {
-  AccountRepositoryPort,
-  SessionRepositoryPort,
-  VerificationCodeRepositoryPort,
+  ACCOUNT_REPOSITORY,
+  SESSION_REPOSITORY,
+  VERIFICATION_CODE_REPOSITORY,
 } from '../../domain/ports';
 
 import {
@@ -14,17 +14,17 @@ import {
 
 export const AUTH_REPOSITORY_PROVIDERS: Provider[] = [
   {
-    provide: AccountRepositoryPort,
+    provide: ACCOUNT_REPOSITORY,
     useClass: PostgresAccountRepository,
   },
 
   {
-    provide: SessionRepositoryPort,
+    provide: SESSION_REPOSITORY,
     useClass: PostgresSessionRepository,
   },
 
   {
-    provide: VerificationCodeRepositoryPort,
+    provide: VERIFICATION_CODE_REPOSITORY,
     useClass: PostgresVerificationCodeRepository,
   },
 ];

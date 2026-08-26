@@ -6,7 +6,7 @@ import { createReadStream } from 'streamifier';
 import { FileUploaderPort } from '../../domain/ports';
 
 /** Excepciones de infraestructura */
-import { ImageUploadErrorException } from '../exceptions';
+import { FileUploadException } from '../exceptions';
 
 @Injectable()
 export class CloudinaryAdpater implements FileUploaderPort<
@@ -29,8 +29,7 @@ export class CloudinaryAdpater implements FileUploaderPort<
       const uploadStream = cloudinary.uploader.upload_stream(
         { folder },
         (error, result) => {
-          if (error)
-            return reject(new ImageUploadErrorException(error.message));
+          if (error) return reject(new FileUploadException(error.message));
           resolve(result as UploadApiResponse);
         },
       );

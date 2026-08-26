@@ -19,21 +19,29 @@ import {
 import {
   AccessTokenGeneratorPort,
   AccessTokenVerifierPort,
+  ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
   EncryptorPort,
   RefreshTokenGeneratorPort,
+  SESSION_REPOSITORY,
   SessionRepositoryPort,
+  VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../domain/ports';
 
 import {
+  EMAIL_SENDER_KEY,
   EmailSenderPort,
+  ID_GENERATOR_KEY,
   IdGeneratorPort,
+  TRANSACTION_MANAGER,
   TransactionManagerPort,
 } from '../../../shared/domain/ports';
 
 import {
+  PERMISSION_REPOSITORY,
   PermissionRepositoryPort,
+  USER_REPOSITORY,
   UserRepositoryPort,
 } from '../../../users/domain/ports';
 
@@ -48,7 +56,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new ChangePasswordUseCase(accountRepository, encryptor);
     },
 
-    inject: [AccountRepositoryPort, EncryptorPort],
+    inject: [ACCOUNT_REPOSITORY, EncryptorPort],
   },
 
   {
@@ -71,11 +79,11 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
     },
 
     inject: [
-      AccountRepositoryPort,
-      UserRepositoryPort,
-      TransactionManagerPort,
+      ACCOUNT_REPOSITORY,
+      USER_REPOSITORY,
+      TRANSACTION_MANAGER,
       EncryptorPort,
-      IdGeneratorPort,
+      ID_GENERATOR_KEY,
     ],
   },
   {
@@ -98,11 +106,11 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
     },
 
     inject: [
-      AccountRepositoryPort,
-      VerificationCodeRepositoryPort,
-      EmailSenderPort,
+      ACCOUNT_REPOSITORY,
+      VERIFICATION_CODE_REPOSITORY,
+      EMAIL_SENDER_KEY,
       EncryptorPort,
-      IdGeneratorPort,
+      ID_GENERATOR_KEY,
     ],
   },
   {
@@ -115,7 +123,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new LogoutUseCase(sessionRepository, encryptor);
     },
 
-    inject: [SessionRepositoryPort, EncryptorPort],
+    inject: [SESSION_REPOSITORY, EncryptorPort],
   },
   {
     provide: RefreshSessionUseCase,
@@ -137,7 +145,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
     },
 
     inject: [
-      SessionRepositoryPort,
+      SESSION_REPOSITORY,
       EncryptorPort,
       AccessTokenGeneratorPort,
       AccessTokenVerifierPort,
@@ -160,7 +168,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       );
     },
 
-    inject: [VerificationCodeRepositoryPort, EmailSenderPort, EncryptorPort],
+    inject: [VERIFICATION_CODE_REPOSITORY, EMAIL_SENDER_KEY, EncryptorPort],
   },
 
   {
@@ -170,7 +178,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new UpdateEmailUseCase(accountRepository);
     },
 
-    inject: [AccountRepositoryPort],
+    inject: [ACCOUNT_REPOSITORY],
   },
 
   {
@@ -183,7 +191,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new UpdatePasswordUseCase(accountRepository, encryptor);
     },
 
-    inject: [AccountRepositoryPort, EncryptorPort],
+    inject: [ACCOUNT_REPOSITORY, EncryptorPort],
   },
 
   {
@@ -212,11 +220,11 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
     },
 
     inject: [
-      AccountRepositoryPort,
-      VerificationCodeRepositoryPort,
-      SessionRepositoryPort,
-      TransactionManagerPort,
-      IdGeneratorPort,
+      ACCOUNT_REPOSITORY,
+      VERIFICATION_CODE_REPOSITORY,
+      SESSION_REPOSITORY,
+      TRANSACTION_MANAGER,
+      ID_GENERATOR_KEY,
       EncryptorPort,
       AccessTokenGeneratorPort,
       RefreshTokenGeneratorPort,
@@ -238,7 +246,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       );
     },
 
-    inject: [SessionRepositoryPort, EncryptorPort, AccessTokenVerifierPort],
+    inject: [SESSION_REPOSITORY, EncryptorPort, AccessTokenVerifierPort],
   },
   {
     provide: ValidateAccessTokenUseCase,
@@ -253,6 +261,6 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       );
     },
 
-    inject: [AccountRepositoryPort, PermissionRepositoryPort],
+    inject: [ACCOUNT_REPOSITORY, PERMISSION_REPOSITORY],
   },
 ];

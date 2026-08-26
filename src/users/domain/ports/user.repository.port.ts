@@ -1,6 +1,7 @@
 import { PaginatedResponse } from '../../../shared/domain/types';
-import { TransactionContext } from '../../../shared/domain/ports';
 import { UpdateUserInput } from '../types';
+
+import { TransactionContext } from '../../../shared/domain/ports';
 
 import { User, UserSearchQuery } from '../entities';
 
@@ -8,12 +9,13 @@ export abstract class UserRepositoryPort {
   abstract find(query: UserSearchQuery): Promise<PaginatedResponse<User>>;
   abstract findById(profileId: string): Promise<User | null>;
   abstract create(user: User, context?: TransactionContext): Promise<void>;
-  abstract update(
+  abstract updateProfile(
     userId: string,
     updateUserInput: UpdateUserInput,
   ): Promise<number>;
+  abstract updateAvatar(userId: string, avatarUrl: string): Promise<number>;
   abstract activate(userId: string): Promise<number>;
   abstract deactivate(userId: string): Promise<number>;
 }
 
-export const USER_REPOSITORY = 'USER_REPOSITORY';
+export const USER_REPOSITORY = Symbol('USER_REPOSITORY');

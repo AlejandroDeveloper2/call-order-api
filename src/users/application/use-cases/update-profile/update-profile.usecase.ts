@@ -1,33 +1,38 @@
-import { Inject, Injectable } from '@nestjs/common';
-
 /** Puertos */
-import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
-/** Excepciones de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
+import { UserRepositoryPort } from '../../../domain/ports';
 
-/** Dtos */
-import { UpdateUserDto } from '../../dto';
+/** Excepciones de aplicación */
+import { UserNotFoundException } from '../../exceptions';
 
-@Injectable()
+/** Value Objects */
+import { Fullname, Phone } from '../../../domain/value-objects';
+
+/** Commands */
+import { UpdateUserCommand } from '../../commands';
+
 export class UpdateProfileUseCase {
-  constructor(
-    @Inject(USER_REPOSITORY)
-    private readonly userRepository: UserRepositoryPort,
-  ) {}
+  constructor(private readonly userRepository: UserRepositoryPort) {}
 
-  async run(profileId: string, updateUserDto: UpdateUserDto): Promise<void> {
-    const affectedRows = await this.userRepository.update(
-      profileId,
-      updateUserDto,
-    );
+  async run(
+    profileId: string,
+    updateUserCommand: UpdateUserCommand,
+  ): Promise<void> {
+    const fullname = updateUserCommand.fullname
+      ? Fullname.create(updateUserCommand.fullname).toString()
+      : undefined;
+
+    const phone = updateUserCommand.phone
+      ? Phone.create(updateUserCommand.phone).toString()
+      : undefined;
+
+    const affectedRows = await this.userRepository.updateProfile(profileId, {
+      fullname,
+      phone,
+    });
 
     if (affectedRows === 0)
-      throw new AppError(
-        USER_ERROR_CODES.userNotFound,
-        404,
+      throw new UserNotFoundException(
         'El ID no corresponde a ningun usuario registrado',
-        true,
       );
   }
 }

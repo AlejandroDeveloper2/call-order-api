@@ -59,7 +59,7 @@ import {
           PostgresSessionSchema,
           PostgresVerificationCodeSchema,
         ],
-        synchronize: true,
+        synchronize: false,
         retryAttempts: 3,
         retryDelay: 2000,
         connectTimeoutMS: 5000,

@@ -7,7 +7,7 @@ import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
 import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
 
 /** Dtos */
-import { UpdateUserStatusDto } from '../../dto';
+import { UpdateUserStatusDto } from '../../../infrastructure/dto';
 /** Caso de uso */
 import { UpdateUserStatusUseCase } from './update-user-status.usecase';
 

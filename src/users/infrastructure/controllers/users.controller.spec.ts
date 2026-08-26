@@ -9,11 +9,7 @@ import {
   UpdateUserAvatarUseCase,
   UpdateUserStatusUseCase,
 } from '../../application/use-cases';
-import {
-  UserQueryDto,
-  UpdateUserStatusDto,
-  UpdateUserDto,
-} from '../../application/dto';
+import { UserQueryDto, UpdateUserStatusDto, UpdateUserDto } from '../dto';
 
 import { UsersController } from './users.controller';
 import { CloudinaryAdpater } from '../../../shared/infrastructure/adapters';

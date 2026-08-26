@@ -1,6 +1,7 @@
 import { addDays, addMinutes } from 'date-fns';
 
-import { Role, User } from '../../../users/domain/entities';
+import { User } from '../../../users/domain/entities';
+
 import {
   Account,
   Session,
@@ -8,12 +9,14 @@ import {
 } from '../../../auth/domain/entities';
 
 export const buildProfile = (overrides: Partial<User> = {}): User => {
-  const profile = new User();
-  profile.userId = 'test-user-id';
-  profile.fullname = 'Alejo Diaz';
-  profile.isActive = true;
-  profile.phone = '3105998799';
-  profile.role = new Role('test-role-id', 'role-name');
+  const profile = User.create(
+    'test-user-id',
+    'Alejo Diaz',
+    'test-role-id',
+    undefined,
+    '3105998799',
+    true,
+  );
 
   Object.assign(profile, overrides);
 
@@ -21,30 +24,26 @@ export const buildProfile = (overrides: Partial<User> = {}): User => {
 };
 
 export const buildAccount = (overrides: Partial<Account> = {}): Account => {
-  const profile = buildProfile();
-  const account = {
-    accountId: 'test-account-id',
-    email: 'test@gmail.com',
-    passwordHash: 'password-hash',
-    mustChangePassword: false,
-    failedAttempts: 0,
-    profile,
-    verificationCodes: [],
-    sessions: [],
-    ...overrides,
-  };
+  const account = Account.create(
+    'test-account-id',
+    'test@gmail.com',
+    'password-hash',
+    false,
+    0,
+    'test-profile-id',
+  );
   Object.assign(account, overrides);
-
   return account;
 };
 
 export const buildSession = (overrides: Partial<Session> = {}): Session => {
-  const session = new Session(
+  const session = Session.create(
     'test-session-id',
     'test-token-hash',
     'test-refresh-token-hash',
     addDays(new Date(), 1),
     new Date(),
+    'test-account-id',
     'Chrome',
     'Windows',
     '127.0.0.1',
@@ -62,7 +61,7 @@ export const buildSession = (overrides: Partial<Session> = {}): Session => {
 export const buildVerificationCode = (
   overrides: Partial<VerificationCode> = {},
 ): VerificationCode => {
-  const verificationCode = new VerificationCode(
+  const verificationCode = VerificationCode.create(
     'test-verification-code-id',
     'test-code-hash',
     'double-factor',

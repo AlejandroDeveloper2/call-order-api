@@ -4,8 +4,8 @@ import { ValidationError } from 'class-validator';
 import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
-import { AppError } from './shared/domain/exceptions';
-import { SHARED_ERROR_CODES } from './shared/domain/exceptions';
+
+import { ValidationException } from './shared/infrastructure/exceptions';
 
 async function bootstrap() {
   console.log('🚀 [1] Iniciando bootstrap...');
@@ -40,12 +40,7 @@ async function bootstrap() {
           .flatMap((error) => Object.values(error.constraints ?? {}))
           .join('; ');
 
-        return new AppError(
-          SHARED_ERROR_CODES.validationError,
-          400,
-          messages || 'Error de validación',
-          true,
-        );
+        return new ValidationException(messages || 'Error de validación');
       },
     }),
   );

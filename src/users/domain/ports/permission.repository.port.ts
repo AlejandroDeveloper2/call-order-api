@@ -3,4 +3,4 @@ import { Permission } from '../entities';
 export abstract class PermissionRepositoryPort {
   abstract findPermissionsByRoleId(roleId: string): Promise<Permission[]>;
 }
-export const PERMISSION_REPOSITORY = 'PERMISSION_REPOSITORY';
+export const PERMISSION_REPOSITORY = Symbol('PERMISSION_REPOSITORY');

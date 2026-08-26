@@ -24,12 +24,8 @@ import {
 } from '../../../shared/infrastructure/decorators';
 import { Auth, GetAccount } from '../../../auth/infrastructure/decorators';
 
-/** Dtos http */
-import {
-  UpdateUserDto,
-  UpdateUserStatusDto,
-  UserQueryDto,
-} from '../../application/dto';
+/** Dtos HTTP */
+import { UpdateUserDto, UpdateUserStatusDto, UserQueryDto } from '../dto';
 
 @Controller('users')
 export class UsersController {

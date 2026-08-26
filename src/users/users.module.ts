@@ -4,23 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 /** Puertos */
 import { PERMISSION_REPOSITORY, USER_REPOSITORY } from './domain/ports';
 
-/** Casos de uso */
-import {
-  FindUserByIdUseCase,
-  FindUsersUseCase,
-  UpdateProfileUseCase,
-  UpdateUserAvatarUseCase,
-  UpdateUserStatusUseCase,
-} from './application/use-cases';
-
 /** Controladores */
 import { UsersController } from './infrastructure/controllers/users.controller';
-
-/** Repositorios */
-import {
-  PostgresPermissionRepository,
-  PostgresUserRepository,
-} from './infrastructure/persistence/postgres/repositories';
 
 /** Esquemas */
 import {
@@ -34,6 +19,12 @@ import { PostgresAccountSchema } from '../auth/infrastructure/persistence/postgr
 /** Módulos */
 import { SharedModule } from '../shared/shared.module';
 
+/** proveedores */
+import {
+  USER_REPOSITORY_PROVIDERS,
+  USER_USE_CASE_PROVIDERS,
+} from './infrastructure/di';
+
 @Module({
   imports: [
     SharedModule,
@@ -46,15 +37,7 @@ import { SharedModule } from '../shared/shared.module';
     ]),
   ],
   controllers: [UsersController],
-  providers: [
-    FindUserByIdUseCase,
-    FindUsersUseCase,
-    UpdateProfileUseCase,
-    UpdateUserStatusUseCase,
-    UpdateUserAvatarUseCase,
-    { provide: USER_REPOSITORY, useClass: PostgresUserRepository },
-    { provide: PERMISSION_REPOSITORY, useClass: PostgresPermissionRepository },
-  ],
+  providers: [...USER_USE_CASE_PROVIDERS, ...USER_REPOSITORY_PROVIDERS],
   exports: [USER_REPOSITORY, PERMISSION_REPOSITORY],
 })
 export class UsersModule {}

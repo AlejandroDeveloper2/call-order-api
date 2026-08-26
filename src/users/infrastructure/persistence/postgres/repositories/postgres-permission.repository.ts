@@ -4,8 +4,12 @@ import { Repository } from 'typeorm';
 
 /** Puertos */
 import { PermissionRepositoryPort } from '../../../../domain/ports';
+
 /** Entidades de dominio */
 import { Permission } from '../../../../domain/entities';
+
+/** Errores de infra */
+import { PersistenceException } from '../../../../../shared/infrastructure/exceptions';
 
 /** Esquema de base de datos */
 import {
@@ -15,9 +19,6 @@ import {
 
 /** Mappers */
 import { PermissionMapper } from '../mappers';
-
-/** Utilidades */
-import { handleServerError } from '../../../../../shared/domain/utils/handleServerError';
 
 @Injectable()
 export class PostgresPermissionRepository implements PermissionRepositoryPort {
@@ -38,8 +39,9 @@ export class PostgresPermissionRepository implements PermissionRepositoryPort {
       const schemas = await qb.getMany();
 
       return schemas.map((schema) => PermissionMapper.toDomain(schema));
-    } catch (error: unknown) {
-      return handleServerError(error);
+    } catch (e: unknown) {
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
 }

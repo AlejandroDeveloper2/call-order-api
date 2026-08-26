@@ -4,20 +4,24 @@ import { Repository, EntityManager } from 'typeorm';
 
 /** Puertos */
 import { UserRepositoryPort } from '../../../../domain/ports';
+import { TransactionContext } from '../../../../../shared/domain/ports';
+
 /** Entidades de dominio */
 import { User, UserSearchQuery } from '../../../../domain/entities';
-import { TransactionContext } from '../../../../../shared/domain/ports';
-/** Tipos de dominio */
+
 /** Tipos de dominio */
 import { UpdateUserInput } from '../../../../domain/types';
 import { PaginatedResponse } from '../../../../../shared/domain/types';
-/** Utilidades de dominio */
-import { handleServerError } from '../../../../../shared/domain/utils/handleServerError';
+
+/** Errores de infra */
+import { PersistenceException } from '../../../../../shared/infrastructure/exceptions';
 
 /**  Esquema de base de datos */
 import { PostgresUserSchema } from '../schemas';
+
 /** Mapper */
 import { UserMapper } from '../mappers';
+
 /** Adaptadores */
 import { TypeOrmTransactionContext } from '../../../../../shared/infrastructure/adapters';
 
@@ -78,7 +82,8 @@ export class PostgresUserRepository implements UserRepositoryPort {
         totalRecords,
       };
     } catch (e: unknown) {
-      return handleServerError(e);
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
   async findById(profileId: string): Promise<User | null> {
@@ -88,7 +93,8 @@ export class PostgresUserRepository implements UserRepositoryPort {
       });
       return schema ? UserMapper.toDomain(schema) : null;
     } catch (e: unknown) {
-      return handleServerError(e);
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
   async create(user: User, context?: TransactionContext): Promise<void> {
@@ -97,21 +103,36 @@ export class PostgresUserRepository implements UserRepositoryPort {
       const schema = UserMapper.toPersistence(user);
       await manager.save(schema);
     } catch (e: unknown) {
-      return handleServerError(e);
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
-  async update(
+  async updateProfile(
     userId: string,
     updateUserInput: UpdateUserInput,
   ): Promise<number> {
     try {
       const result = await this.repository.update(
         { id: userId },
-        { ...updateUserInput },
+        updateUserInput,
       );
       return result.affected || 0;
     } catch (e: unknown) {
-      return handleServerError(e);
+      const error = e as Error;
+      throw new PersistenceException(error.message);
+    }
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<number> {
+    try {
+      const result = await this.repository.update(
+        { id: userId },
+        { avatar: avatarUrl },
+      );
+      return result.affected || 0;
+    } catch (e: unknown) {
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
   async activate(userId: string): Promise<number> {
@@ -122,7 +143,8 @@ export class PostgresUserRepository implements UserRepositoryPort {
       );
       return result.affected || 0;
     } catch (e: unknown) {
-      return handleServerError(e);
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
   async deactivate(userId: string): Promise<number> {
@@ -133,7 +155,8 @@ export class PostgresUserRepository implements UserRepositoryPort {
       );
       return result.affected || 0;
     } catch (e: unknown) {
-      return handleServerError(e);
+      const error = e as Error;
+      throw new PersistenceException(error.message);
     }
   }
 }
