@@ -7,6 +7,8 @@ import { AppModule } from './app.module';
 
 import { ValidationException } from './shared/infrastructure/exceptions';
 
+import { AppExceptionFilter } from './shared/infrastructure/filters/app-exception.filter';
+
 async function bootstrap() {
   console.log('🚀 [1] Iniciando bootstrap...');
   const app = await NestFactory.create(AppModule);
@@ -35,7 +37,6 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       exceptionFactory: (errors: ValidationError[]) => {
-        console.log(errors);
         const messages = errors
           .flatMap((error) => Object.values(error.constraints ?? {}))
           .join('; ');
@@ -44,6 +45,8 @@ async function bootstrap() {
       },
     }),
   );
+
+  app.useGlobalFilters(new AppExceptionFilter());
 
   /** Start the server */
   await app.listen(process.env.PORT ?? 3000);
