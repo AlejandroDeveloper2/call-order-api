@@ -6,7 +6,7 @@ import { Request } from 'express';
 import { TokenExpiredError } from 'jsonwebtoken';
 
 /** Tipos */
-import { JwtPayload } from '../../../shared/domain/types';
+import { AccessTokenPayload } from '../../domain/types';
 
 /** Errores */
 import { ExpiredTokenException, MalformedTokenException } from '../exceptions';
@@ -36,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  handleRequest<TUser = JwtPayload>(
+  handleRequest<TUser = AccessTokenPayload>(
     err: Error | null | false,
     user: TUser,
     info: unknown,
@@ -57,7 +57,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return user;
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: AccessTokenPayload) {
     return await this.validateAccessTokenUseCase.run(payload);
   }
 }
