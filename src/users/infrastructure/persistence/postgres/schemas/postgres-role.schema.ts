@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { PostgresUserSchema } from './postgres-user.schema';
 
 @Entity('roles')
 export class PostgresRoleSchema {
@@ -13,6 +15,9 @@ export class PostgresRoleSchema {
 
   @Column({ unique: true })
   name!: string;
+
+  @OneToMany(() => PostgresUserSchema, (user) => user.role)
+  users!: PostgresUserSchema[];
 
   @CreateDateColumn()
   createdAt!: Date;

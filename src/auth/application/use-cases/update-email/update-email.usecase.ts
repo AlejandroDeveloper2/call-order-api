@@ -1,38 +1,32 @@
-import { Inject, Injectable } from '@nestjs/common';
-
 /** Puertos */
-import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-} from '../../../domain/ports';
+import { AccountRepositoryPort } from '../../../domain/ports';
+
+/** Value Objects */
+import { Email } from '../../../domain/value-objects';
 
 /** Excepciones */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { AccountNotFoundException } from '../../exceptions';
 
-/** Dtos */
-import { UpdateEmailDto } from '../../dto';
+/** Commands */
+import { UpdateEmailCommand } from '../../commands';
 
-@Injectable()
 export class UpdateEmailUseCase {
-  constructor(
-    @Inject(ACCOUNT_REPOSITORY)
-    private readonly accountRepository: AccountRepositoryPort,
-  ) {}
+  constructor(private readonly accountRepository: AccountRepositoryPort) {}
 
-  async run(accountId: string, updateEmailDto: UpdateEmailDto): Promise<void> {
-    const { updatedEmail } = updateEmailDto;
+  async run(
+    accountId: string,
+    updateEmailCommand: UpdateEmailCommand,
+  ): Promise<void> {
+    const { updatedEmail } = updateEmailCommand;
 
-    const affectedRows = await this.accountRepository.update(accountId, {
-      email: updatedEmail,
-    });
+    const updatedEmailValue = Email.create(updatedEmail).toString();
+
+    const affectedRows = await this.accountRepository.updateEmail(
+      accountId,
+      updatedEmailValue,
+    );
 
     if (affectedRows === 0)
-      throw new AppError(
-        AUTH_ERROR_CODES.accountNotFound,
-        404,
-        'Cuenta no encontrada',
-        true,
-      );
+      throw new AccountNotFoundException('Cuenta no encontrada');
   }
 }

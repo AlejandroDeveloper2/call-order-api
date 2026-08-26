@@ -10,7 +10,7 @@ import {
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 /** Dtos */
-import { UpdateEmailDto } from '../../dto';
+import { UpdateEmailDto } from '../../../infrastructure/dto';
 
 /** Casos de uso */
 import { UpdateEmailUseCase } from './update-email.usecase';

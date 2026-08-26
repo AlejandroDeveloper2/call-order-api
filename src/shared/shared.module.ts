@@ -5,6 +5,7 @@ import {
   CloudinaryAdpater,
   NodeMailerAdapter,
   TypeOrmTransactionManagerAdapter,
+  UUIDAdapter,
 } from './infrastructure/adapters';
 
 import { CloudinaryUploadInterceptor } from './infrastructure/interceptors';
@@ -21,6 +22,7 @@ import { EMAIL_SENDER_KEY, TRANSACTION_MANAGER } from './domain/ports';
     },
     CloudinaryAdpater,
     CloudinaryUploadInterceptor,
+    UUIDAdapter,
   ],
   exports: [
     { provide: EMAIL_SENDER_KEY, useClass: NodeMailerAdapter },
@@ -30,6 +32,7 @@ import { EMAIL_SENDER_KEY, TRANSACTION_MANAGER } from './domain/ports';
     },
     CloudinaryAdpater,
     CloudinaryUploadInterceptor,
+    UUIDAdapter,
   ],
 })
 export class SharedModule {}

@@ -9,7 +9,7 @@ import {
 
 /** Casos de uso */
 import {
-  FindUserByAccountUseCase,
+  FindUserByIdUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
   UpdateUserAvatarUseCase,
@@ -19,33 +19,33 @@ import {
 /** Decoradores */
 import {
   ApiMessage,
-  AvatarUrl,
-  GetAccount,
-  UploadAvatar,
+  ImageUrl,
+  UploadImage,
 } from '../../../shared/infrastructure/decorators';
-/** Dtos */
+import { Auth, GetAccount } from '../../../auth/infrastructure/decorators';
+
+/** Dtos http */
 import {
   UpdateUserDto,
   UpdateUserStatusDto,
   UserQueryDto,
 } from '../../application/dto';
-import { Auth } from '../../../auth/infrastructure/decorators';
 
 @Controller('users')
 export class UsersController {
   constructor(
-    private readonly findUserByAccountUseCase: FindUserByAccountUseCase,
+    private readonly findUserByIdUseCase: FindUserByIdUseCase,
     private readonly findUsersUseCase: FindUsersUseCase,
     private readonly updateProfileUseCase: UpdateProfileUseCase,
     private readonly updateUserStatusUseCase: UpdateUserStatusUseCase,
     private readonly updateUserAvatarUseCase: UpdateUserAvatarUseCase,
   ) {}
 
-  @Get('/account')
+  @Get('/profile')
   @Auth('users:read:profile')
   @ApiMessage('Perfil de usuario obtenido correctamente')
-  getByAccountId(@GetAccount('accountId', ParseUUIDPipe) accountId: string) {
-    return this.findUserByAccountUseCase.run(accountId);
+  getUserById(@GetAccount('profileId', ParseUUIDPipe) profileId: string) {
+    return this.findUserByIdUseCase.run(profileId);
   }
   @Get('/')
   @Auth('users:read:all')
@@ -66,10 +66,10 @@ export class UsersController {
   @Patch('/avatar')
   @Auth('users:update:avatar')
   @ApiMessage('Avatar actualizado correctamente')
-  @UploadAvatar()
+  @UploadImage()
   patchUserAvatar(
     @GetAccount('profileId', ParseUUIDPipe) profileId: string,
-    @AvatarUrl() fileUrl: string,
+    @ImageUrl() fileUrl: string,
   ) {
     return this.updateUserAvatarUseCase.run(profileId, fileUrl);
   }

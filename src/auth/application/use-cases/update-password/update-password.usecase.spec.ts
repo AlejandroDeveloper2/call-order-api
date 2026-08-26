@@ -10,7 +10,7 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 import { UpdatePasswordUseCase } from './update-password.usecase';
 
-import { UpdatePasswordDto } from '../../dto';
+import { UpdatePasswordDto } from '../../../infrastructure/dto';
 
 jest.mock('bcrypt');
 

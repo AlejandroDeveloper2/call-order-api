@@ -4,41 +4,15 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
-/** Puertos */
-import {
-  ACCOUNT_REPOSITORY,
-  SESSION_REPOSITORY,
-  VERIFICATION_CODE_REPOSITORY,
-} from './domain/ports';
-
-/** Casos de uso */
-import {
-  CreateAccountUseCase,
-  LoginUseCase,
-  ResendCodeUseCase,
-  ValidateIdentityUseCase,
-  LogoutUseCase,
-  RefreshSessionUseCase,
-  ValidateSessionUseCase,
-  UpdateEmailUseCase,
-  ChangePasswordUseCase,
-  UpdatePasswordUseCase,
-} from './application/use-cases';
-
 /** Controladores */
 import { AuthController } from './infrastructure/controllers/auth.controller';
+
 /** Esquemas */
 import {
   PostgresAccountSchema,
   PostgresSessionSchema,
   PostgresVerificationCodeSchema,
 } from './infrastructure/persistence/postgres/schemas';
-/** Repositorios */
-import {
-  PostgresAccountRepository,
-  PostgresSessionRepository,
-  PostgresVerificationCodeRepository,
-} from './infrastructure/persistence/postgres/repositories';
 
 /** Módulos */
 import { UsersModule } from '../users/users.module';
@@ -49,6 +23,13 @@ import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
 
 /** Guards */
 import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
+
+/** Proveedores */
+import {
+  AUTH_REPOSITORY_PROVIDERS,
+  AUTH_SECURITY_PROVIDERS,
+  AUTH_USE_CASE_PROVIDERS,
+} from './infrastructure/di';
 
 @Module({
   imports: [
@@ -73,22 +54,9 @@ import { PermissionsGuard } from './infrastructure/guards/permissions.guard';
   providers: [
     JwtStrategy,
     PermissionsGuard,
-    LoginUseCase,
-    ValidateIdentityUseCase,
-    CreateAccountUseCase,
-    ResendCodeUseCase,
-    LogoutUseCase,
-    RefreshSessionUseCase,
-    ValidateSessionUseCase,
-    UpdateEmailUseCase,
-    ChangePasswordUseCase,
-    UpdatePasswordUseCase,
-    { provide: ACCOUNT_REPOSITORY, useClass: PostgresAccountRepository },
-    { provide: SESSION_REPOSITORY, useClass: PostgresSessionRepository },
-    {
-      provide: VERIFICATION_CODE_REPOSITORY,
-      useClass: PostgresVerificationCodeRepository,
-    },
+    ...AUTH_USE_CASE_PROVIDERS,
+    ...AUTH_REPOSITORY_PROVIDERS,
+    ...AUTH_SECURITY_PROVIDERS,
   ],
   exports: [PermissionsGuard],
 })

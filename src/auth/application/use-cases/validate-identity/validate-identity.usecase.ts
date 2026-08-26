@@ -1,94 +1,128 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
 import { isAfter, addDays } from 'date-fns';
-import crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
 
 /** Entidades de dominio */
 import { Session } from '../../../domain/entities';
+
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
+  AccessTokenGeneratorPort,
   AccountRepositoryPort,
-  SESSION_REPOSITORY,
+  EncryptorPort,
+  RefreshTokenGeneratorPort,
   SessionRepositoryPort,
-  VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
+
 import {
-  TRANSACTION_MANAGER,
-  type TransactionManagerPort,
+  IdGeneratorPort,
+  TransactionManagerPort,
 } from '../../../../shared/domain/ports';
+
+/** Value Objects */
+import {
+  Code,
+  Email,
+  JwtAccessToken,
+  RefreshToken,
+} from '../../../domain/value-objects';
+
 /** Errores de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { ExpiredCodeException, InvalidCodeException } from '../../exceptions';
 
-/** Dtos */
-import { ValidateIdentityDto } from '../../dto';
+/** Modelos de lectura */
+import { VerificationCodeValidationModel } from '../../../domain/models';
 
-@Injectable()
+/** Commands */
+import { ValidateIdentityCommand } from '../../commands';
+
 export class ValidateIdentityUseCase {
   constructor(
-    private readonly tokenService: JwtService,
-    @Inject(ACCOUNT_REPOSITORY)
     private readonly accountRepository: AccountRepositoryPort,
-    @Inject(VERIFICATION_CODE_REPOSITORY)
     private readonly verificationCodeRepository: VerificationCodeRepositoryPort,
-    @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: SessionRepositoryPort,
-    @Inject(TRANSACTION_MANAGER)
     private readonly transactionManager: TransactionManagerPort,
+    private readonly idGenerator: IdGeneratorPort,
+    private readonly encryptor: EncryptorPort,
+    private readonly accessTokenGenerator: AccessTokenGeneratorPort,
+    private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
   ) {}
 
-  async run(
-    validateAccountDto: ValidateIdentityDto,
-  ): Promise<{ token: string; refreshToken: string }> {
-    /** Validar si el código de verificación es valido */
-    const codes = await this.verificationCodeRepository.findByAccountId(
-      validateAccountDto.accountId,
-    );
+  private async validateVerificationCode(
+    email: string,
+    code: string,
+  ): Promise<VerificationCodeValidationModel> {
+    /** Validar entradas importantes con los value objects */
+    const emailValue = Email.create(email).toString();
+    const codeValue = Code.create(code).toString();
 
-    const results = await Promise.all(
-      codes.map(async (code) => {
-        const isValid = await bcrypt.compare(
-          validateAccountDto.verificationCode,
-          code.codeHash,
-        );
-        return { ...code, isValid };
-      }),
-    );
+    /** Obtener los códigos de verificación activos  */
+    const verificationCodes =
+      await this.verificationCodeRepository.findForIdentityValidation(
+        emailValue,
+      );
 
-    const validCode = results.find((r) => r.isValid);
+    /** Comparar el hash del código para filtrar el código de verificación actual */
+    let validCode: VerificationCodeValidationModel | null = null;
+    for (const verificationCode of verificationCodes) {
+      const isValid = await this.encryptor.compare(
+        codeValue,
+        verificationCode.codeHash,
+      );
+      if (isValid) {
+        validCode = verificationCode;
+        break;
+      }
+    }
 
     if (!validCode)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidCode,
-        401,
-        'Código de verificación de autenticación invalido',
-        true,
-      );
+      throw new InvalidCodeException('Código de verificación invalido');
+
+    return validCode;
+  }
+
+  async run(
+    validateAccountCommand: ValidateIdentityCommand,
+  ): Promise<{ token: string; refreshToken: string }> {
+    const {
+      verificationCode,
+      email,
+      browser,
+      operatingSystem,
+      ipAddress,
+      userAgent,
+      deviceName,
+      deviceType,
+    } = validateAccountCommand;
+
+    /** Comparar el hash del código para filtrar el código de verificación actual */
+    const validCode = await this.validateVerificationCode(
+      verificationCode,
+      email,
+    );
 
     /** Validar si el código ha expirado */
     const today = new Date();
     if (isAfter(today, new Date(validCode.expiresAt)))
-      throw new AppError(
-        AUTH_ERROR_CODES.expiredCode,
-        401,
+      throw new ExpiredCodeException(
         'Código de verificación de autenticación ha expirado',
-        true,
       );
 
     /** Generar el token y refresh token */
-    const token = this.tokenService.sign({
+    const token = await this.accessTokenGenerator.generate({
       accountId: validCode.accountId,
-      roleId: validCode.account?.profile?.roleId as string,
-      profileId: validCode.account?.profile?.userId as string,
+      roleId: validCode.profile.roleId,
+      profileId: validCode.profile.profileId,
     });
-    const refreshToken = this.generateRefreshToken();
+
+    const refreshToken = this.refreshTokenGenerator.generate();
+
+    /** Validar con value objects */
+    const tokenValue = JwtAccessToken.create(token).toString();
+    const refreshTokenValue = RefreshToken.create(refreshToken).toString();
+
     /** Encriptar ambos token para agregar una capa solida de seguridad */
-    const tokenHash = await bcrypt.hash(token, 10);
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const tokenHash = await this.encryptor.hash(tokenValue, 20);
+    const refreshTokenHash = await this.encryptor.hash(refreshTokenValue, 20);
 
     /** Invalidar las sesiones activas anteriores de la misma cuenta en una sola consulta */
     await this.sessionRepository.revokeByAccountId(
@@ -97,23 +131,25 @@ export class ValidateIdentityUseCase {
     );
 
     /** Crear la nueva sesión a nivel de base de datos con metadatos opcionales */
-    const expiresAt = addDays(new Date(), 1); // coincide con JWT `expiresIn: 1d`
+    const expiresAt = addDays(new Date(), 1);
     const lastActivityAt = new Date();
 
-    const session = new Session(
-      uuidv4(),
-      validCode.accountId,
+    const sessionId = this.idGenerator.generate();
+
+    const session = Session.create(
+      sessionId,
       tokenHash,
       refreshTokenHash,
       expiresAt,
       lastActivityAt,
-      validateAccountDto.browser || 'unknown',
-      validateAccountDto.operatingSystem || 'unknown',
-      validateAccountDto.ipAddress || '0.0.0.0',
-      validateAccountDto.userAgent || '',
+      validCode.accountId,
+      browser || 'unknown',
+      operatingSystem || 'unknown',
+      ipAddress || '0.0.0.0',
+      userAgent || '',
       undefined,
-      validateAccountDto.deviceName,
-      validateAccountDto.deviceType,
+      deviceName,
+      deviceType,
     );
 
     await this.transactionManager.run(async (context) => {
@@ -121,31 +157,23 @@ export class ValidateIdentityUseCase {
       await this.sessionRepository.create(session, context);
 
       /** Invalidar el código de verificación anterior */
-      await this.verificationCodeRepository.update(
+      await this.verificationCodeRepository.markAsUsed(
         validCode.verificationCodeId,
-        {
-          usedAt: new Date(),
-        },
+        new Date(),
         context,
       );
 
       /** Actualizar último inicio de sesión */
-      await this.accountRepository.update(
-        validateAccountDto.accountId,
-        {
-          lastLoginAt: new Date(),
-        },
+      await this.accountRepository.updateLastLogin(
+        validCode.accountId,
+        new Date(),
         context,
       );
     });
 
     return {
-      token,
-      refreshToken,
+      token: tokenValue,
+      refreshToken: refreshTokenValue,
     };
-  }
-
-  private generateRefreshToken(): string {
-    return crypto.randomBytes(64).toString('hex');
   }
 }

@@ -2,15 +2,14 @@ import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 
-/** Errores de dominio */
-import {
-  AppError,
-  SHARED_ERROR_CODES,
-} from '../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../domain/exceptions/auth-error-codes';
-
 /** Keys */
 import { PERMISSIONS_KEY } from '../decorators';
+
+/** Excepciones */
+import {
+  InsufficientPermissionsException,
+  NotAuthenticatedException,
+} from '../exceptions';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -28,13 +27,7 @@ export class PermissionsGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const account = request.account;
 
-    if (!account)
-      throw new AppError(
-        SHARED_ERROR_CODES.notAuthenticated,
-        401,
-        'Usuario no autenticado',
-        true,
-      );
+    if (!account) throw new NotAuthenticatedException('Usuario no autenticado');
 
     const userPermissions: string[] = account.permissions || [];
 
@@ -43,11 +36,8 @@ export class PermissionsGuard implements CanActivate {
     );
 
     if (!hasAll)
-      throw new AppError(
-        AUTH_ERROR_CODES.insufficientPermissions,
-        403,
+      throw new InsufficientPermissionsException(
         'Permisos insuficientes para acceder a este recurso',
-        true,
       );
 
     return true;

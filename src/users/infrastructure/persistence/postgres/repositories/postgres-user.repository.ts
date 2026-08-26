@@ -81,9 +81,11 @@ export class PostgresUserRepository implements UserRepositoryPort {
       return handleServerError(e);
     }
   }
-  async findByAccountId(accountId: string): Promise<User | null> {
+  async findById(profileId: string): Promise<User | null> {
     try {
-      const schema = await this.repository.findOneBy({ accountId });
+      const schema = await this.repository.findOneBy({
+        id: profileId,
+      });
       return schema ? UserMapper.toDomain(schema) : null;
     } catch (e: unknown) {
       return handleServerError(e);

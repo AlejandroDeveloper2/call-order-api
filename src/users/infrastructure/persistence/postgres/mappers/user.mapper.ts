@@ -1,39 +1,27 @@
-import { Account } from '../../../../../auth/domain/entities';
-import { Role, User } from '../../../../domain/entities';
+import { User } from '../../../../domain/entities';
+
+import { RoleMapper } from './role.mapper';
 
 import { PostgresUserSchema } from '../schemas/postgres-user.schema';
 
 export class UserMapper {
   static toDomain(schema: PostgresUserSchema): User {
-    return new User(
-      schema.id,
-      schema.fullname,
-      schema.accountId,
-      schema.roleId,
-      schema.avatar,
-      schema.phone,
-      schema.isActive,
-      schema.account
-        ? new Account(
-            schema.account.id,
-            schema.account.email,
-            schema.account.passwordHash,
-            schema.account.mustChangePassword,
-            schema.account.failedAttempts,
-            schema.account.lastLoginAt,
-            schema.account.lockedUtil,
-          )
-        : undefined,
-      schema.role ? new Role(schema.role.id, schema.role.name) : undefined,
-    );
+    const domain = new User();
+    domain.userId = schema.id;
+    domain.fullname = schema.fullname;
+    domain.avatar = schema.avatar;
+    domain.phone = schema.phone;
+    domain.role = RoleMapper.toDomain(schema.role);
+    domain.isActive = schema.isActive;
+
+    return domain;
   }
 
   static toPersistence(domain: User): PostgresUserSchema {
     const schema = new PostgresUserSchema();
     schema.id = domain.userId;
     schema.fullname = domain.fullname;
-    schema.accountId = domain.accountId;
-    schema.roleId = domain.roleId;
+    schema.role = RoleMapper.toPersistence(domain.role);
     schema.avatar = domain.avatar;
     schema.phone = domain.phone;
     schema.isActive = domain.isActive;

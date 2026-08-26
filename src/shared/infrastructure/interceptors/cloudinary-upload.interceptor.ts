@@ -8,7 +8,7 @@ import { Observable } from 'rxjs';
 import { UploadApiResponse } from 'cloudinary';
 
 /** Excepciones de dominio */
-import { AppError, SHARED_ERROR_CODES } from '../../domain/exceptions';
+import { FileNotProvidedException, FileUploadException } from '../exceptions';
 
 /** Adpatadores */
 import { CloudinaryAdpater } from '../adapters';
@@ -33,11 +33,8 @@ export class CloudinaryUploadInterceptor<T = any> implements NestInterceptor<
     const file = request.file;
 
     if (!file)
-      throw new AppError(
-        SHARED_ERROR_CODES.fileNotProvided,
-        400,
+      throw new FileNotProvidedException(
         'No se ha proporcionado ningun archivo',
-        true,
       );
 
     try {
@@ -47,12 +44,7 @@ export class CloudinaryUploadInterceptor<T = any> implements NestInterceptor<
       request.fileUrl = result.secure_url;
     } catch (error: unknown) {
       console.error(error);
-      throw new AppError(
-        SHARED_ERROR_CODES.imageUploadError,
-        400,
-        'Error al subir el archivo a Cloudinary',
-        true,
-      );
+      throw new FileUploadException('Error al subir el archivo a Cloudinary');
     }
 
     return next.handle();

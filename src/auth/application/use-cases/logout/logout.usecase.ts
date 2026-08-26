@@ -1,49 +1,35 @@
-import { Inject, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-
 /** Puertos */
-import {
-  SESSION_REPOSITORY,
-  SessionRepositoryPort,
-} from '../../../domain/ports';
+import { EncryptorPort, SessionRepositoryPort } from '../../../domain/ports';
 
 /** Errores */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { InvalidSessionException } from '../../exceptions';
 
-@Injectable()
+/** Value Objects */
+import { JwtAccessToken } from '../../../domain/value-objects';
+
 export class LogoutUseCase {
   constructor(
-    @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: SessionRepositoryPort,
+    private readonly encryptor: EncryptorPort,
   ) {}
 
   async run(accountId: string, token: string): Promise<void> {
-    /** Obtener las sessiones activas asociadas a la cuenta  */
-    const sessions = await this.sessionRepository.findByAccountId(accountId);
+    /** Obtener la sesión activa por ID de cuenta proporcionado */
+    const session =
+      await this.sessionRepository.findActiveForValidation(accountId);
+
+    /** Validar el token con el value Object */
+    const tokenValue = JwtAccessToken.create(token).toString();
+
+    if (!session) throw new InvalidSessionException('Sesión invalida');
 
     /** Comparar el hash del token para filtrar la sesión actual */
-    const results = await Promise.all(
-      sessions.map(async (session) => {
-        const isValid = await bcrypt.compare(token, session.tokenHash);
-        return { ...session, isValid };
-      }),
-    );
-
-    const validSession = results.find((r) => r.isValid);
+    const isValid = await this.encryptor.compare(tokenValue, session.tokenHash);
 
     /** Validar si la sesión es valida */
-    if (!validSession)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidSession,
-        401,
-        'Sesión invalida',
-        true,
-      );
+    if (!isValid) throw new InvalidSessionException('Sesión invalida');
 
-    /** Invalidar la sesión actual */
-    await this.sessionRepository.update(validSession.sessionId, {
-      revokedAt: new Date(),
-    });
+    /** Revocar la sesión actual */
+    await this.sessionRepository.revoke(session.sessionId);
   }
 }

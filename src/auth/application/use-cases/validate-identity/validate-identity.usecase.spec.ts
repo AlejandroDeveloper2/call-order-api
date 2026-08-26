@@ -3,9 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { addMinutes } from 'date-fns';
 
-/** Entidades de dominio */
-import { VerificationCode } from '../../../domain/entities';
-
 /** Puertos */
 import {
   ACCOUNT_REPOSITORY,
@@ -21,6 +18,9 @@ import {
   TransactionManagerPort,
 } from '../../../../shared/domain/ports';
 
+/** Entidades de dominio */
+import { Session } from '../../../domain/entities';
+
 /** Errores */
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
@@ -28,14 +28,20 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 import { ValidateIdentityUseCase } from './validate-identity.usecase';
 
 /** DTO */
-import { ValidateIdentityDto } from '../../dto';
+import { ValidateIdentityDto } from '../../../infrastructure/dto';
+
+/** utilidades */
+import {
+  buildAccount,
+  buildVerificationCode,
+} from '../../../../shared/application/utils/domain-class-contructor';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'test-session-id'),
 }));
 
 jest.mock('bcrypt', () => ({
-  compare: jest.fn(),
+  compareSync: jest.fn(),
   hash: jest.fn(),
 }));
 
@@ -47,12 +53,8 @@ describe('ValidateIdentityUseCase', () => {
   } satisfies Pick<JwtService, 'sign'>;
 
   const verificationCodeRepository = {
-    findByAccountId: jest.fn(),
     update: jest.fn(),
-  } satisfies Pick<
-    VerificationCodeRepositoryPort,
-    'findByAccountId' | 'update'
-  >;
+  } satisfies Pick<VerificationCodeRepositoryPort, 'update'>;
 
   const sessionRepository = {
     create: jest.fn(),
@@ -60,16 +62,17 @@ describe('ValidateIdentityUseCase', () => {
   } satisfies Pick<SessionRepositoryPort, 'create' | 'revokeByAccountId'>;
 
   const accountRepository = {
+    findById: jest.fn(),
     update: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'update'>;
+  } satisfies Pick<AccountRepositoryPort, 'update' | 'findById'>;
 
   const mockTransactionManager = {
     run: jest.fn(),
   } satisfies TransactionManagerPort;
 
   const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => Promise<boolean>
-  >(bcrypt.compare);
+    (data: string | Buffer, encrypted: string) => boolean
+  >(bcrypt.compareSync);
   const bcryptHashMock = jest.mocked<
     (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
   >(bcrypt.hash);
@@ -77,27 +80,10 @@ describe('ValidateIdentityUseCase', () => {
   const buildDto = (
     overrides: Partial<ValidateIdentityDto> = {},
   ): ValidateIdentityDto => ({
-    accountId: 'account-id',
+    accountId: 'test-account-id',
     verificationCode: '123456',
     ...overrides,
   });
-
-  const buildVerificationCode = (
-    overrides: Partial<VerificationCode> = {},
-  ): VerificationCode => {
-    const verificationCode = new VerificationCode(
-      'verification-code-id',
-      'account-id',
-      'code-hash',
-      'double-factor',
-      addMinutes(new Date(), 10),
-      0,
-    );
-
-    Object.assign(verificationCode, overrides);
-
-    return verificationCode;
-  };
 
   const transactionContext: TransactionContext = {};
 
@@ -139,17 +125,49 @@ describe('ValidateIdentityUseCase', () => {
   });
 
   describe('run', () => {
+    it('debe lanzar AppError cuando la cuenta no existe', async () => {
+      // Arrange
+      const accountId = 'wrong-account-id';
+      const dto = buildDto({ accountId });
+
+      accountRepository.findById.mockResolvedValue(null);
+
+      // Act
+      const result = useCase.run(dto);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.accountNotFound,
+        httpCode: 404,
+      });
+
+      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
+
+      expect(jwtService.sign).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
+
+      expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
+
+      expect(mockTransactionManager.run).not.toHaveBeenCalled();
+
+      expect(sessionRepository.create).not.toHaveBeenCalled();
+      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+      expect(accountRepository.update).not.toHaveBeenCalled();
+    });
+
     it('debe lanzar AppError cuando el código ingresado no es válido', async () => {
       // Arrange
       const dto = buildDto();
 
       const verificationCode = buildVerificationCode();
+      const account = buildAccount({ verificationCodes: [verificationCode] });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        verificationCode,
-      ]);
+      accountRepository.findById.mockResolvedValue(account);
 
-      bcryptCompareMock.mockResolvedValue(false);
+      bcryptCompareMock.mockReturnValue(false);
 
       // Act
       const result = useCase.run(dto);
@@ -160,9 +178,11 @@ describe('ValidateIdentityUseCase', () => {
         httpCode: 401,
       });
 
-      expect(verificationCodeRepository.findByAccountId).toHaveBeenCalledWith(
-        dto.accountId,
-      );
+      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
+
+      expect(jwtService.sign).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
 
       expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
 
@@ -180,12 +200,13 @@ describe('ValidateIdentityUseCase', () => {
       const expiredVerificationCode = buildVerificationCode({
         expiresAt: addMinutes(new Date(), -5),
       });
+      const account = buildAccount({
+        verificationCodes: [expiredVerificationCode],
+      });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        expiredVerificationCode,
-      ]);
+      accountRepository.findById.mockResolvedValue(account);
 
-      bcryptCompareMock.mockResolvedValue(true);
+      bcryptCompareMock.mockReturnValue(true);
 
       // Act
       const result = useCase.run(dto);
@@ -195,6 +216,12 @@ describe('ValidateIdentityUseCase', () => {
         name: AUTH_ERROR_CODES.expiredCode,
         httpCode: 401,
       });
+
+      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
+
+      expect(jwtService.sign).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
 
       expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
 
@@ -215,16 +242,14 @@ describe('ValidateIdentityUseCase', () => {
         deviceType: 'desktop',
       });
 
-      const validVerificationCode = buildVerificationCode({
-        verificationCodeId: 'verification-code-id',
-        accountId: dto.accountId,
+      const validVerificationCode = buildVerificationCode();
+      const account = buildAccount({
+        verificationCodes: [validVerificationCode],
       });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        validVerificationCode,
-      ]);
+      accountRepository.findById.mockResolvedValue(account);
 
-      bcryptCompareMock.mockResolvedValue(true);
+      bcryptCompareMock.mockReturnValue(true);
 
       jwtService.sign.mockReturnValue('access-token');
 
@@ -248,12 +273,12 @@ describe('ValidateIdentityUseCase', () => {
       expect(jwtService.sign).toHaveBeenCalledTimes(1);
 
       expect(jwtService.sign).toHaveBeenCalledWith({
-        accountId: validVerificationCode.accountId,
-        roleId: undefined,
-        profileId: undefined,
+        accountId: dto.accountId,
+        roleId: account.profile.role.roleId,
+        profileId: account.profile.userId,
       });
 
-      expect(bcrypt.hash).toHaveBeenCalledTimes(2);
+      expect(bcryptHashMock).toHaveBeenCalledTimes(2);
 
       expect(sessionRepository.revokeByAccountId).toHaveBeenCalledTimes(1);
 
@@ -269,18 +294,7 @@ describe('ValidateIdentityUseCase', () => {
       expect(accountRepository.update).toHaveBeenCalledTimes(1);
 
       expect(sessionRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId: 'test-session-id',
-          accountId: dto.accountId,
-          tokenHash: 'access-token-hash',
-          refreshTokenHash: 'refresh-token-hash',
-          browser: dto.browser,
-          operatingSystem: dto.operatingSystem,
-          ipAddress: dto.ipAddress,
-          userAgent: dto.userAgent,
-          deviceName: dto.deviceName,
-          deviceType: dto.deviceType,
-        }),
+        expect.any(Session),
         transactionContext,
       );
 

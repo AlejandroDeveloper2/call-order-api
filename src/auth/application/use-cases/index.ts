@@ -8,3 +8,4 @@ export * from './validate-session/validate-session.usecase';
 export * from './update-email/update-email.usecase';
 export * from './change-password/change-password.usecase';
 export * from './update-password/update-password.usecase';
+export * from './validate-access-token/validate-access-token.usecase';

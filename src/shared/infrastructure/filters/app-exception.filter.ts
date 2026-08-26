@@ -1,32 +1,49 @@
 import {
-  ExceptionFilter,
-  Catch,
   ArgumentsHost,
+  Catch,
+  ExceptionFilter,
   HttpException,
+  HttpStatus,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Response, Request } from 'express';
 
-/** Exceptions */
-import { AppError } from '../../domain/exceptions';
+// Excepciones de dominio
+import { DomainException } from '../../domain/exceptions';
 
-/** Utils */
+// Excepciones de aplicación
+import { ApplicationException } from '../../application/exceptions';
+
+// Excepciones de infraestructura
+import { InfrastructureException } from '../exceptions/infrastructure.exception';
+
+/** Mapper para códigos de estado HTTP */
+import { EXCEPTION_HTTP_STATUS } from '../exceptions/exception-http-status.mapper';
+
+//Utilidad para manejar la respuesta HTTP de error al cliente
 import { handleHttpError } from '../utils/handleHttpError';
-
-/** Error Codes */
-import { SHARED_ERROR_CODES } from '../../domain/exceptions';
 
 @Catch()
 export class AppExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
+
     const response = ctx.getResponse<Response>();
+
     const request = ctx.getRequest<Request>();
 
-    if (exception instanceof AppError) {
+    if (
+      exception instanceof DomainException ||
+      exception instanceof ApplicationException ||
+      exception instanceof InfrastructureException
+    ) {
+      const httpCode =
+        EXCEPTION_HTTP_STATUS[exception.code] ??
+        HttpStatus.INTERNAL_SERVER_ERROR;
+
       return handleHttpError(response, {
-        name: exception.name,
-        httpCode: exception.httpCode,
-        isOperational: exception.isOperational,
+        name: exception.code,
+        httpCode,
+        isOperational: true,
         description: exception.message,
         path: request.url,
         timestamp: new Date().toISOString(),
@@ -47,10 +64,10 @@ export class AppExceptionFilter implements ExceptionFilter {
     }
 
     return handleHttpError(response, {
-      name: SHARED_ERROR_CODES.internalServerError,
-      httpCode: 500,
+      name: 'INTERNAL_SERVER_ERROR',
+      httpCode: HttpStatus.INTERNAL_SERVER_ERROR,
       isOperational: false,
-      description: 'Unexpected error occurred',
+      description: 'Ha ocurrido un error inesperado',
       path: request.url,
       timestamp: new Date().toISOString(),
     });

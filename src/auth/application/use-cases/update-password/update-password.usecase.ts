@@ -1,45 +1,37 @@
-import { Injectable, Inject } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-
 /** Puertos */
-import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-} from '../../../domain/ports';
+import { AccountRepositoryPort, EncryptorPort } from '../../../domain/ports';
+
+/** Value objects */
+import { Password } from '../../../domain/value-objects';
 
 /** Excepciones */
-import { AppError } from '../../../../shared/domain/exceptions';
-/** Códigos de error */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { AccountNotFoundException } from '../../exceptions';
 
-/** Dtos */
-import { UpdatePasswordDto } from '../../dto';
+/** Commands */
+import { UpdatePasswordCommand } from '../../commands';
 
-@Injectable()
 export class UpdatePasswordUseCase {
   constructor(
-    @Inject(ACCOUNT_REPOSITORY)
     private readonly accountRepository: AccountRepositoryPort,
+    private readonly encryptor: EncryptorPort,
   ) {}
 
   async run(
     accountId: string,
-    updatePasswordDto: UpdatePasswordDto,
+    updatePasswordCommand: UpdatePasswordCommand,
   ): Promise<void> {
-    const { newPassword } = updatePasswordDto;
+    const { newPassword } = updatePasswordCommand;
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const newPasswordValue = Password.create(newPassword).toString();
 
-    const affectedRows = await this.accountRepository.update(accountId, {
+    const passwordHash = await this.encryptor.hash(newPasswordValue, 20);
+
+    const affectedRows = await this.accountRepository.updatePassword(
+      accountId,
       passwordHash,
-    });
+    );
 
     if (affectedRows === 0)
-      throw new AppError(
-        AUTH_ERROR_CODES.accountNotFound,
-        404,
-        'Cuenta no encontrada',
-        true,
-      );
+      throw new AccountNotFoundException('Cuenta no encontrada');
   }
 }

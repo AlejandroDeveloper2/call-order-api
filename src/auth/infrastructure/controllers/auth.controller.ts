@@ -23,7 +23,7 @@ import {
   ValidateSessionUseCase,
 } from '../../application/use-cases';
 
-/** Dtos */
+/** Dtos Http */
 import {
   ChangePasswordDto,
   CreateAccountDto,
@@ -32,16 +32,11 @@ import {
   UpdateEmailDto,
   UpdatePasswordDto,
   ValidateIdentityDto,
-} from '../../application/dto';
+} from '../dto';
 
 /** Decoradores */
-import {
-  ApiMessage,
-  BearerToken,
-  Cookie,
-  GetAccount,
-} from '../../../shared/infrastructure/decorators';
-import { Auth } from '../decorators';
+import { Auth, BearerToken, Cookie, GetAccount } from '../decorators';
+import { ApiMessage } from '../../../shared/infrastructure/decorators';
 
 @Controller('auth')
 export class AuthController {
@@ -85,7 +80,7 @@ export class AuthController {
   }
 
   @Post('/register')
-  @Auth('auth:create:account')
+  // @Auth('auth:create:account')
   @ApiMessage('Cuenta creada con éxito')
   postCreateAccount(@Body() createAccountDto: CreateAccountDto) {
     return this.createAccountUseCase.run(createAccountDto);

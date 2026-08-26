@@ -1,62 +1,58 @@
-import { Inject, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
+  type EncryptorPort,
 } from '../../../domain/ports';
 
+/** Value Objects */
+import { Password } from '../../../domain/value-objects';
+
 /** Excepciones */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import {
+  AccountNotFoundException,
+  IncorrectPasswordException,
+} from '../../exceptions';
 
-/** Dto */
-import { ChangePasswordDto } from '../../dto';
+/** Dtos */
+import { ChangePasswordCommand } from '../../commands';
 
-@Injectable()
 export class ChangePasswordUseCase {
   constructor(
-    @Inject(ACCOUNT_REPOSITORY)
     private readonly accountRepository: AccountRepositoryPort,
+    private readonly encryptor: EncryptorPort,
   ) {}
 
   async run(
     accountId: string,
-    changePasswordDto: ChangePasswordDto,
+    changePasswordCommand: ChangePasswordCommand,
   ): Promise<void> {
-    const { currentPassword, newPassword } = changePasswordDto;
+    /** Creamos los value objects para validación de las reglas de dominio */
+    const currentPassword = Password.create(
+      changePasswordCommand.currentPassword,
+    ).toString();
+    const newPassword = Password.create(
+      changePasswordCommand.newPassword,
+    ).toString();
 
     /** Obtenemos la cuenta por ID */
-    const account = await this.accountRepository.findById(accountId);
+    const account =
+      await this.accountRepository.findForUpdatingPassword(accountId);
 
-    if (!account)
-      throw new AppError(
-        AUTH_ERROR_CODES.accountNotFound,
-        404,
-        'Cuenta no encontrada',
-        true,
-      );
+    if (!account) throw new AccountNotFoundException('Cuenta no encontrada');
 
     /** Validar si la contraseña actual coincide con la almacenada en db */
-    const isCorrectPassword = await bcrypt.compare(
+    const isCorrectPassword = await this.encryptor.compare(
       currentPassword,
       account.passwordHash,
     );
 
     if (!isCorrectPassword)
-      throw new AppError(
-        AUTH_ERROR_CODES.incorrectPassword,
-        400,
-        'Contraseña actual incorrecta',
-        true,
-      );
+      throw new IncorrectPasswordException('Contraseña actual incorrecta');
 
     /** Encriptamos la nueva contraseña  y la actualizamos */
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    const newPasswordHash = await this.encryptor.hash(newPassword, 20);
 
-    await this.accountRepository.update(accountId, {
-      passwordHash: newPasswordHash,
-    });
+    /** Actualizamos la contraseña */
+    await this.accountRepository.updatePassword(accountId, newPasswordHash);
   }
 }

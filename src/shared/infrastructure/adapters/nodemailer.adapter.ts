@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
-import { AppError, SHARED_ERROR_CODES } from '../../domain/exceptions';
 import { EmailSenderPort } from '../../domain/ports/email-sender.port';
+
+import { EmailSenderException } from '../exceptions';
 
 @Injectable()
 export class NodeMailerAdapter implements EmailSenderPort {
@@ -32,11 +33,8 @@ export class NodeMailerAdapter implements EmailSenderPort {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
 
-      throw new AppError(
-        SHARED_ERROR_CODES.emailSendingError,
-        500,
+      throw new EmailSenderException(
         `An error occurred while sending the email: ${message}`,
-        false,
       );
     }
   }

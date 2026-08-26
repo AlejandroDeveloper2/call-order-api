@@ -1,14 +1,33 @@
 import { TransactionContext } from '../../../shared/domain/ports';
+
 import { VerificationCode } from '../entities';
-import { UpdateCodeInput } from '../types';
+
+import { VerificationCodeValidationModel } from '../models';
 
 export abstract class VerificationCodeRepositoryPort {
-  abstract findByAccountId(accountId: string): Promise<VerificationCode[]>;
+  abstract findForIdentityValidation(
+    email: string,
+  ): Promise<VerificationCodeValidationModel[]>;
+
+  abstract findExpiredForForwarding(
+    email: string,
+  ): Promise<VerificationCodeValidationModel[]>;
+
   abstract create(verificationCode: VerificationCode): Promise<void>;
-  abstract update(
+
+  abstract markAsUsed(
     verificationCodeId: string,
-    updateCodeInput: UpdateCodeInput,
+    usedAt: Date,
     context?: TransactionContext,
+  ): Promise<number>;
+
+  abstract refresh(
+    verificationCodeId: string,
+    payload: {
+      attempts: number;
+      codeHash: string;
+      expiresAt: Date;
+    },
   ): Promise<number>;
 }
 

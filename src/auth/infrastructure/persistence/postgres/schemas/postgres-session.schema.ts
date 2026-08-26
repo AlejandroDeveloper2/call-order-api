@@ -4,7 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToOne,
+  ManyToOne,
   JoinColumn,
 } from 'typeorm';
 
@@ -15,11 +15,13 @@ export class PostgresSessionSchema {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @OneToOne(() => PostgresAccountSchema, { onDelete: 'NO ACTION' })
+  @ManyToOne(() => PostgresAccountSchema, (account) => account.sessions, {
+    onDelete: 'NO ACTION',
+  })
   @JoinColumn({ name: 'accountId' })
   account!: PostgresAccountSchema;
 
-  @Column()
+  @Column({ type: 'uuid' })
   accountId!: string;
 
   @Column()
@@ -40,13 +42,13 @@ export class PostgresSessionSchema {
   @Column({ nullable: true })
   userAgent?: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'timestamptz' })
   lastActivityAt!: Date;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   revokedAt?: Date;
 
   @Column({ nullable: true })
@@ -55,9 +57,9 @@ export class PostgresSessionSchema {
   @Column({ nullable: true })
   deviceType?: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

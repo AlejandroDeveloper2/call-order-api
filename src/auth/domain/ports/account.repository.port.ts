@@ -1,19 +1,63 @@
+/** Puertos */
 import { TransactionContext } from '../../../shared/domain/ports';
 
+/** Entidades */
 import { Account } from '../entities';
-import { UpdateAccountMetaInput } from '../types';
+
+/** Modelos de lectura*/
+import {
+  AccountIdentityValidationModel,
+  AccountLoginModel,
+  AccountPasswordUpdatingModel,
+  AccountTokenValidationModel,
+} from '../models';
 
 export abstract class AccountRepositoryPort {
-  abstract findById(accountId: string): Promise<Account | null>;
-  abstract findByEmail(email: string): Promise<Account | null>;
+  abstract findForLoginByEmail(
+    email: string,
+  ): Promise<AccountLoginModel | null>;
+
+  abstract verifyByEmail(email: string): Promise<boolean>;
+
+  abstract findForIdentityValidation(
+    email: string,
+  ): Promise<AccountIdentityValidationModel | null>;
+
+  abstract findForUpdatingPassword(
+    accountId: string,
+  ): Promise<AccountPasswordUpdatingModel | null>;
+
+  abstract findForTokenValidation(
+    accountId: string,
+  ): Promise<AccountTokenValidationModel | null>;
+
   abstract create(
     account: Account,
     context?: TransactionContext,
   ): Promise<void>;
-  abstract update(
+
+  abstract updateLastLogin(
     accountId: string,
-    updateAccountMetaInput: UpdateAccountMetaInput,
+    lastLoginAt: Date,
     context?: TransactionContext,
+  ): Promise<number>;
+
+  abstract block(
+    accountId: string,
+    lockedUntil: Date,
+    failedAttempts: number,
+  ): Promise<number>;
+
+  abstract unlock(accountId: string): Promise<number>;
+
+  abstract updatePassword(
+    accountId: string,
+    updatedPasswordHash: string,
+  ): Promise<number>;
+
+  abstract updateEmail(
+    accountId: string,
+    updatedEmail: string,
   ): Promise<number>;
 }
 

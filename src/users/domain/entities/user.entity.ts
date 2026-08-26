@@ -1,20 +1,49 @@
-import { Account } from '../../../auth/domain/entities';
-import { Role } from './role.entity';
-
 export class User {
   constructor(
-    public readonly userId: string,
-    public fullname: string,
-    public readonly accountId: string,
-    public readonly roleId: string,
-    public avatar?: string,
-    public phone?: string,
-    public isActive: boolean = true,
-    public readonly account?: Account,
-    public readonly role?: Role,
+    private readonly userId: string,
+    private fullname: string,
+    private readonly roleId: string,
+    private avatar?: string,
+    private phone?: string,
+    private isActive: boolean = true,
   ) {}
 
-  updateUserStatus(isActive: boolean): void {
+  static create(
+    userId: string,
+    fullname: string,
+    roleId: string,
+    avatar?: string,
+    phone?: string,
+    isActive: boolean = true,
+  ): User {
+    return new User(userId, fullname, roleId, avatar, phone, isActive);
+  }
+
+  toggleState(isActive: boolean): void {
     this.isActive = isActive;
+  }
+
+  get getUserId(): string {
+    return this.userId;
+  }
+
+  get getFullname(): string {
+    return this.fullname;
+  }
+
+  get getRoleId(): string {
+    return this.roleId;
+  }
+
+  get getAvatar(): string | undefined {
+    return this.avatar;
+  }
+
+  get getPhone(): string | undefined {
+    return this.phone;
+  }
+
+  get getIsActive(): boolean {
+    return this.isActive;
   }
 }

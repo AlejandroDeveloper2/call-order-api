@@ -1,70 +1,47 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-
 /** Puertos */
 import {
-  SESSION_REPOSITORY,
+  AccessTokenVerifierPort,
+  EncryptorPort,
   SessionRepositoryPort,
 } from '../../../domain/ports';
 
 /** Tipos */
-import { JwtPayload } from '../../../../shared/domain/types';
+import { AccessTokenPayload } from '../../../domain/types';
 
 /** Errores */
-import {
-  AppError,
-  SHARED_ERROR_CODES,
-} from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { InvalidSessionException } from '../../exceptions';
 
-@Injectable()
 export class ValidateSessionUseCase {
   constructor(
-    private readonly jwtService: JwtService,
-    @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: SessionRepositoryPort,
+    private readonly encryptor: EncryptorPort,
+    private readonly accessTokenVerifier: AccessTokenVerifierPort,
   ) {}
 
   async run(
     accountId: string,
     token: string,
-  ): Promise<JwtPayload & { token: string }> {
+  ): Promise<AccessTokenPayload & { token: string }> {
     /** Obtener el payload del token */
-    let payload: JwtPayload;
+    let payload: AccessTokenPayload;
     try {
-      payload = await this.jwtService.verifyAsync(token, {
-        ignoreExpiration: true,
-      });
+      payload = await this.accessTokenVerifier.verify(token);
     } catch {
-      throw new AppError(
-        SHARED_ERROR_CODES.invalidToken,
-        401,
-        'Token de sesión inválido',
-        true,
-      );
+      throw new InvalidSessionException('Token de sesión inválido');
     }
 
-    /** Obtener las sesiones asociadas al Id de la cuenta */
-    const sessions = await this.sessionRepository.findByAccountId(accountId);
+    /** Obtener las sesiones asociadas al ID de cuenta proporcionado  */
+    const session =
+      await this.sessionRepository.findActiveForValidation(accountId);
 
-    const results = await Promise.all(
-      sessions.map(async (session) => {
-        const isValid = await bcrypt.compare(token, session.tokenHash);
-        return { ...session, isValid };
-      }),
-    );
+    if (!session) throw new InvalidSessionException('Sesión invalida');
+
+    /** Comparar el hash del token para filtrar la sesión actual */
+
+    const isValid = await this.encryptor.compare(token, session.tokenHash);
 
     /** Validar si la sesión es valida */
-    const session = results.find((r) => r.isValid);
-
-    if (!session)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidSession,
-        401,
-        'Sesión invalida',
-        true,
-      );
+    if (!isValid) throw new InvalidSessionException('Sesión invalida');
 
     return {
       token,

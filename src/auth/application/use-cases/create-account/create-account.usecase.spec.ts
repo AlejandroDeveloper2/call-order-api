@@ -28,6 +28,10 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 /** Use case */
 import { CreateAccountUseCase } from './create-account.usecase';
+import { CreateAccountDto } from '../../../infrastructure/dto';
+
+/** Utilidades */
+import { buildAccount } from '../../../../shared/application/utils/domain-class-contructor';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(),
@@ -53,12 +57,12 @@ describe('CreateAccountUseCase', () => {
     run: jest.fn(),
   } satisfies TransactionManagerPort;
 
-  const createAccountDto = {
+  const createAccountDto: CreateAccountDto = {
     fullname: 'John Doe',
     phone: '+1234567890',
     email: 'john@example.com',
     password: 'SecurePass123!',
-    roleId: 'role-123',
+    role: { roleId: 'role-123', name: 'Administrador' },
   };
 
   const accountId = '11111111-1111-4111-8111-111111111111';
@@ -103,23 +107,30 @@ describe('CreateAccountUseCase', () => {
 
   describe('run()', () => {
     it('debe lanzar un error cuando el email ya existe', async () => {
-      const existingAccount = new Account(
-        'existing-id',
-        createAccountDto.email,
-        'existing-password-hash',
-        false,
-        0,
-      );
+      // Arrange
+      const existingEmail: string = 'existing-email@gmail.com';
+
+      const existingAccount = buildAccount({
+        accountId: 'existing-id',
+        email: existingEmail,
+        passwordHash: 'existing-password-hash',
+        mustChangePassword: false,
+        failedAttempts: 0,
+      });
 
       mockAccountRepository.findByEmail.mockResolvedValue(existingAccount);
 
-      await expect(useCase.run(createAccountDto)).rejects.toMatchObject({
+      // Act
+      const result = useCase.run({ ...createAccountDto, email: existingEmail });
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
         name: AUTH_ERROR_CODES.accountAlreadyExists,
         httpCode: 409,
       });
 
       expect(mockAccountRepository.findByEmail).toHaveBeenCalledWith(
-        createAccountDto.email,
+        existingEmail,
       );
 
       expect(mockTransactionManager.run).not.toHaveBeenCalled();
@@ -128,10 +139,13 @@ describe('CreateAccountUseCase', () => {
     });
 
     it('debe crear la cuenta y el usuario dentro de una transacción', async () => {
+      // Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
+      // Act
       await useCase.run(createAccountDto);
 
+      // Assert
       expect(mockAccountRepository.findByEmail).toHaveBeenCalledWith(
         createAccountDto.email,
       );
@@ -154,12 +168,15 @@ describe('CreateAccountUseCase', () => {
     });
 
     it('debe crear la cuenta con los datos correctos', async () => {
+      // Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
+      //Act
       await useCase.run(createAccountDto);
 
       const createdAccount = mockAccountRepository.create.mock.calls[0][0];
 
+      //Assert
       expect(createdAccount.accountId).toBe(accountId);
       expect(createdAccount.email).toBe(createAccountDto.email);
       expect(createdAccount.passwordHash).toBe('hashed-password');
@@ -168,36 +185,44 @@ describe('CreateAccountUseCase', () => {
     });
 
     it('debe crear el usuario con los datos correctos', async () => {
+      //Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
+      //Act
       await useCase.run(createAccountDto);
 
       const createdUser = mockUserRepository.create.mock.calls[0][0];
 
+      //Assert
       expect(createdUser.userId).toBe(userId);
       expect(createdUser.fullname).toBe(createAccountDto.fullname);
-      expect(createdUser.roleId).toBe(createAccountDto.roleId);
+      expect(createdUser.role).toMatchObject(createAccountDto.role);
       expect(createdUser.phone).toBe(createAccountDto.phone);
       expect(createdUser.isActive).toBe(true);
     });
 
-    it('debe asociar el usuario con la cuenta creada', async () => {
+    it('debe asociar el cuenta con el perfil creado', async () => {
+      //Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
+      //Act
       await useCase.run(createAccountDto);
 
+      const createdUser = mockUserRepository.create.mock.calls[0][0];
       const createdAccount = mockAccountRepository.create.mock.calls[0][0];
 
-      const createdUser = mockUserRepository.create.mock.calls[0][0];
-
-      expect(createdUser.accountId).toBe(createdAccount.accountId);
+      //Assert
+      expect(createdAccount.profile.userId).toBe(createdUser.userId);
     });
 
     it('debe generar el hash de la contraseña con bcrypt', async () => {
+      //Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
+      //Act
       await useCase.run(createAccountDto);
 
+      //Assert
       expect(bcrypt.hash).toHaveBeenCalledWith(createAccountDto.password, 10);
 
       const createdAccount = mockAccountRepository.create.mock.calls[0][0];
@@ -206,46 +231,55 @@ describe('CreateAccountUseCase', () => {
     });
 
     it('debe utilizar el mismo contexto transaccional para Account y User', async () => {
+      // Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
+      // Act
       await useCase.run(createAccountDto);
 
       const accountCall = mockAccountRepository.create.mock.calls[0];
 
       const userCall = mockUserRepository.create.mock.calls[0];
 
+      // Assert
       expect(accountCall[1]).toBe(transactionContext);
       expect(userCall[1]).toBe(transactionContext);
     });
 
-    it('debe propagar el error si falla la creación de la cuenta', async () => {
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
-
-      const databaseError = new Error('Database constraint violation');
-
-      mockAccountRepository.create.mockRejectedValue(databaseError);
-
-      await expect(useCase.run(createAccountDto)).rejects.toThrow(
-        databaseError.message,
-      );
-
-      expect(mockAccountRepository.create).toHaveBeenCalledTimes(1);
-      expect(mockUserRepository.create).not.toHaveBeenCalled();
-    });
-
     it('debe propagar el error si falla la creación del usuario', async () => {
+      //Arrange
       mockAccountRepository.findByEmail.mockResolvedValue(null);
 
       const databaseError = new Error('Foreign key constraint failed');
 
       mockUserRepository.create.mockRejectedValue(databaseError);
 
-      await expect(useCase.run(createAccountDto)).rejects.toThrow(
-        databaseError.message,
-      );
+      //Act
+      const result = useCase.run(createAccountDto);
 
-      expect(mockAccountRepository.create).toHaveBeenCalledTimes(1);
+      //Assert
+      await expect(result).rejects.toThrow(databaseError.message);
+
       expect(mockUserRepository.create).toHaveBeenCalledTimes(1);
+      expect(mockAccountRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('debe propagar el error si falla la creación de la cuenta', async () => {
+      // Arrange
+      mockAccountRepository.findByEmail.mockResolvedValue(null);
+
+      const databaseError = new Error('Database constraint violation');
+
+      mockAccountRepository.create.mockRejectedValue(databaseError);
+
+      //Act
+      const result = useCase.run(createAccountDto);
+
+      //Assert
+      await expect(result).rejects.toThrow(databaseError.message);
+
+      expect(mockUserRepository.create).toHaveBeenCalledTimes(1);
+      expect(mockAccountRepository.create).toHaveBeenCalledTimes(1);
     });
   });
 });

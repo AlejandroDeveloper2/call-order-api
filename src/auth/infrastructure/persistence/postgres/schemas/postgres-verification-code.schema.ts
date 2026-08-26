@@ -3,7 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
-  OneToOne,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -17,11 +17,15 @@ export class PostgresVerificationCodeSchema {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @OneToOne(() => PostgresAccountSchema, { onDelete: 'NO ACTION' })
+  @ManyToOne(
+    () => PostgresAccountSchema,
+    (account) => account.verificationCodes,
+    { onDelete: 'NO ACTION' },
+  )
   @JoinColumn({ name: 'accountId' })
   account!: PostgresAccountSchema;
 
-  @Column()
+  @Column({ type: 'uuid' })
   accountId!: string;
 
   @Column()
@@ -30,18 +34,18 @@ export class PostgresVerificationCodeSchema {
   @Column({ enum: ['double-factor'], default: 'double-factor' })
   type!: VerificationCodeType;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'timestamptz' })
   expiresAt!: Date;
 
   @Column({ default: 0 })
   attempts!: number;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   usedAt?: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

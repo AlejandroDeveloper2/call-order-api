@@ -4,8 +4,9 @@ import { createReadStream } from 'streamifier';
 
 /** Puertos */
 import { FileUploaderPort } from '../../domain/ports';
-/** Excepciones de dominio */
-import { AppError, SHARED_ERROR_CODES } from '../../domain/exceptions';
+
+/** Excepciones de infraestructura */
+import { ImageUploadErrorException } from '../exceptions';
 
 @Injectable()
 export class CloudinaryAdpater implements FileUploaderPort<
@@ -29,14 +30,7 @@ export class CloudinaryAdpater implements FileUploaderPort<
         { folder },
         (error, result) => {
           if (error)
-            return reject(
-              new AppError(
-                SHARED_ERROR_CODES.imageUploadError,
-                error.http_code,
-                error.message,
-                false,
-              ),
-            );
+            return reject(new ImageUploadErrorException(error.message));
           resolve(result as UploadApiResponse);
         },
       );

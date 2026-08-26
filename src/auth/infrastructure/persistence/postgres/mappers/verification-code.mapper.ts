@@ -2,19 +2,16 @@ import { VerificationCode } from '../../../../domain/entities';
 
 import { PostgresVerificationCodeSchema } from '../schemas';
 
-import { AccountMapper } from './account.mapper';
-
 export class VerificationCodeMapper {
   static toDomain(schema: PostgresVerificationCodeSchema): VerificationCode {
     return new VerificationCode(
       schema.id,
-      schema.accountId,
       schema.codeHash,
       schema.type,
       schema.expiresAt,
       schema.attempts,
+      schema.accountId,
       schema.usedAt,
-      AccountMapper.toDomain(schema.account),
     );
   }
 
@@ -22,13 +19,13 @@ export class VerificationCodeMapper {
     domain: VerificationCode,
   ): PostgresVerificationCodeSchema {
     const schema = new PostgresVerificationCodeSchema();
-    schema.id = domain.verificationCodeId;
-    schema.accountId = domain.accountId;
-    schema.codeHash = domain.codeHash;
-    schema.type = domain.type;
-    schema.expiresAt = domain.expiresAt;
-    schema.attempts = domain.attempts;
-    schema.usedAt = domain.usedAt;
+    schema.id = domain.getVerificationCodeId;
+    schema.codeHash = domain.getCodeHash;
+    schema.type = domain.getType;
+    schema.expiresAt = domain.getExpiresAt;
+    schema.attempts = domain.getAttempts;
+    schema.accountId = domain.getAccountId;
+    schema.usedAt = domain.getUsedAt;
     return schema;
   }
 }

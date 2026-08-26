@@ -5,9 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
+  OneToMany,
+  JoinColumn,
 } from 'typeorm';
 
 import { PostgresUserSchema } from '../../../../../users/infrastructure/persistence/postgres/schemas';
+
+import { PostgresVerificationCodeSchema } from './postgres-verification-code.schema';
+import { PostgresSessionSchema } from './postgres-session.schema';
 
 @Entity('accounts')
 export class PostgresAccountSchema {
@@ -23,23 +28,40 @@ export class PostgresAccountSchema {
   @Column({ default: false })
   mustChangePassword!: boolean;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastLoginAt?: Date;
 
   @Column()
   failedAttempts!: number;
 
-  @Column({ type: 'date', nullable: true })
-  lockedUtil?: Date;
+  @Column({ type: 'timestamptz', nullable: true })
+  lockedUntil?: Date;
 
-  @OneToOne(() => PostgresUserSchema, (profile) => profile.account, {
+  @OneToOne(() => PostgresUserSchema, {
     onDelete: 'NO ACTION',
+    // eager: true,
   })
+  @JoinColumn({ name: 'profileId' })
   profile!: PostgresUserSchema;
 
-  @CreateDateColumn()
+  @Column()
+  profileId!: string;
+
+  @OneToMany(() => PostgresVerificationCodeSchema, (code) => code.account, {
+    onDelete: 'NO ACTION',
+    // eager: true,
+  })
+  verificationCodes!: PostgresVerificationCodeSchema[];
+
+  @OneToMany(() => PostgresSessionSchema, (session) => session.account, {
+    onDelete: 'NO ACTION',
+    // eager: true,
+  })
+  sessions!: PostgresSessionSchema[];
+
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

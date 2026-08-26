@@ -1,88 +1,91 @@
-import { Inject, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { addHours, addMinutes } from 'date-fns';
-import { v4 as uuidv4 } from 'uuid';
 
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
-  VERIFICATION_CODE_REPOSITORY,
+  EncryptorPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
-import * as ports from '../../../../shared/domain/ports';
+import {
+  EmailSenderPort,
+  IdGeneratorPort,
+} from '../../../../shared/domain/ports';
+
 /** Entidades de dominio */
 import { VerificationCode } from '../../../domain/entities';
+
 /** Errores de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
-/** utilidades */
-import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
+import {
+  AccountLockedException,
+  InactiveAccountException,
+  InvalidCredentialsException,
+} from '../../exceptions';
 
-/** Dto */
-import { LoginDto } from '../../dto';
+/** Value Objects */
+import { Code, Email, Password } from '../../../domain/value-objects';
 
-@Injectable()
+/** Modelos de lectura */
+import { AccountLoginModel } from '../../../domain/models';
+
+/** Commands */
+import { LoginCommand } from '../../commands';
+
 export class LoginUseCase {
   constructor(
-    @Inject(ACCOUNT_REPOSITORY)
     private readonly accountRepository: AccountRepositoryPort,
-    @Inject(VERIFICATION_CODE_REPOSITORY)
     private readonly verificationCodeRepository: VerificationCodeRepositoryPort,
-    @Inject(ports.EMAIL_SENDER_KEY)
-    private readonly emailSender: ports.EmailSenderPort,
+    private readonly emailSender: EmailSenderPort,
+    private readonly encryptor: EncryptorPort,
+    private readonly idGenerator: IdGeneratorPort,
   ) {}
 
-  async run(loginDto: LoginDto): Promise<string> {
-    const account = await this.accountRepository.findByEmail(loginDto.email);
+  async run(loginCommand: LoginCommand): Promise<void> {
+    /** Validamos la entradacon el value object  */
+    const email = Email.create(loginCommand.email).toString();
+
+    /** Buscamos la cuenta asociada al email proporcionado */
+    const account = await this.accountRepository.findForLoginByEmail(email);
+
+    /** Validamos si las credenciales son validas */
     if (!account)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidCredentials,
-        401,
-        'Credenciales invalidas',
-        true,
-      );
+      throw new InvalidCredentialsException('Credenciales invalidas');
 
-    if (account.lockedUtil && !this.isLockExpired(account.lockedUtil))
-      throw new AppError(
-        AUTH_ERROR_CODES.loginLocked,
-        403,
+    /** Validamos si el usuario tiene la cuenta bloqueada por exceso de intentos fallidos de login */
+    if (account.lockedUntil && !this.isLockExpired(account.lockedUntil))
+      throw new AccountLockedException(
         'Has superado el número permitido de intentos de inicio de sesión, intenta durante 2 horas.',
-        true,
       );
 
-    if (account.lockedUtil && this.isLockExpired(account.lockedUtil)) {
+    /** Resetear los intentos y fecha limite de bloqueo si el tiempo de bloqueo ha expirado */
+    if (account.lockedUntil && this.isLockExpired(account.lockedUntil)) {
       await this.resetAccountLock(account.accountId);
       account.failedAttempts = 0;
-      account.lockedUtil = undefined;
+      account.lockedUntil = undefined;
     }
 
-    if (account.profile && !account.profile.isActive)
-      throw new AppError(
-        AUTH_ERROR_CODES.inactiveAccount,
-        403,
-        'Usuario inactivo',
-        true,
-      );
+    /** Validar si el perfil esta activo */
+    if (!account.profile.isActive)
+      throw new InactiveAccountException('Usuario inactivo');
 
-    const isCorrectPassword = await bcrypt.compare(
-      loginDto.password,
+    const password = Password.create(loginCommand.password).toString();
+
+    /** Validar si la contraseña es valida */
+    const isCorrectPassword = await this.encryptor.compare(
+      password,
       account.passwordHash,
     );
 
+    /** Si la contraseña es incorrecta gestionar la función de bloqueo de login */
     if (!isCorrectPassword) {
-      await this.handleInvalidPassword(account);
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidCredentials,
-        401,
-        'Credenciales invalidas',
-        true,
-      );
+      await this.handleInvalidPassword({
+        accountId: account.accountId,
+        failedAttempts: account.failedAttempts,
+      });
+      throw new InvalidCredentialsException('Credenciales invalidas');
     }
 
-    await this.generateAndSendVerificationCode(account);
-
-    return account.accountId;
+    /** Generar, crear y enviar el código de verificación de identidad al correo del usuario */
+    await this.generateAndSendVerificationCode({ ...account, email });
   }
 
   private isLockExpired(lockedUtil: Date): boolean {
@@ -90,10 +93,7 @@ export class LoginUseCase {
   }
 
   private async resetAccountLock(accountId: string): Promise<void> {
-    await this.accountRepository.update(accountId, {
-      failedAttempts: 0,
-      lockedUtil: undefined,
-    });
+    await this.accountRepository.unlock(accountId);
   }
 
   private async handleInvalidPassword(account: {
@@ -104,32 +104,38 @@ export class LoginUseCase {
     const lockedUtil =
       failedAttempts >= 5 ? addHours(new Date(), 2) : undefined;
 
-    await this.accountRepository.update(account.accountId, {
-      failedAttempts,
-      lockedUtil,
-    });
+    if (lockedUtil) {
+      await this.accountRepository.block(
+        account.accountId,
+        lockedUtil,
+        failedAttempts,
+      );
+    }
   }
 
-  private async generateAndSendVerificationCode(account: {
-    accountId: string;
-    email: string;
-  }): Promise<void> {
-    const code = generateVerificationCode();
-    const codeHash = await bcrypt.hash(code, 10);
-    const verificationCode = new VerificationCode(
-      uuidv4(),
-      account.accountId,
+  private async generateAndSendVerificationCode(
+    account: AccountLoginModel & { email: string },
+  ): Promise<void> {
+    const codeId = this.idGenerator.generate();
+
+    const codeValue = Code.create(VerificationCode.generate()).toString();
+
+    const codeHash = await this.encryptor.hash(codeValue, 20);
+
+    const verificationCode = VerificationCode.create(
+      codeId,
       codeHash,
       'double-factor',
       addMinutes(new Date(), 10),
       0,
+      account.accountId,
     );
 
     await this.verificationCodeRepository.create(verificationCode);
     await this.emailSender.sendEmail(
       account.email,
       'Código de verificación de CallOrder',
-      this.buildVerificationEmail(code),
+      this.buildVerificationEmail(codeValue),
     );
   }
 

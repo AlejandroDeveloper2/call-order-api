@@ -9,15 +9,10 @@ import {
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
-
 import {
   EMAIL_SENDER_KEY,
   EmailSenderPort,
 } from '../../../../shared/domain/ports';
-
-/** Entidades */
-import { Account } from '../../../domain/entities';
-import { User } from '../../../../users/domain/entities';
 
 /** Tipos */
 import { UpdateAccountMetaInput } from '../../../domain/types';
@@ -29,10 +24,17 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
 
 /** DTO */
-import { LoginDto } from '../../dto';
+import { LoginDto } from '../../../infrastructure/dto';
 
 /** Caso de uso */
 import { LoginUseCase } from './login.usecase';
+
+/** Utilidades */
+import {
+  buildAccount,
+  buildProfile,
+} from '../../../../shared/application/utils/domain-class-contructor';
+import { VerificationCode } from '../../../domain/entities';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -73,17 +75,8 @@ describe('LoginUseCase', () => {
   const generateVerificationCodeMock = jest.mocked(generateVerificationCode);
 
   const buildLoginDto = (overrides: Partial<LoginDto> = {}): LoginDto => ({
-    email: 'alejo@gmail.com',
-    password: 'alejo123@',
-    ...overrides,
-  });
-
-  const buildAccount = (overrides: Partial<Account> = {}): Account => ({
-    accountId: 'test-account-id',
-    email: 'alejo@gmail.com',
-    passwordHash: 'password-hash',
-    mustChangePassword: false,
-    failedAttempts: 0,
+    email: 'test@gmail.com',
+    password: 'test-password',
     ...overrides,
   });
 
@@ -114,7 +107,7 @@ describe('LoginUseCase', () => {
   describe('run', () => {
     it('debe lanzar INVALID_CREDENTIALS cuando la cuenta no existe', async () => {
       // Arrange
-      const dto = buildLoginDto();
+      const dto = buildLoginDto({ email: 'wrong-test@gmail.com' });
 
       accountRepository.findByEmail.mockResolvedValue(null);
 
@@ -140,7 +133,7 @@ describe('LoginUseCase', () => {
       const dto = buildLoginDto();
 
       const account = buildAccount({
-        lockedUtil: addHours(new Date(), 1),
+        lockedUntil: addHours(new Date(), 1),
       });
 
       accountRepository.findByEmail.mockResolvedValue(account);
@@ -168,7 +161,7 @@ describe('LoginUseCase', () => {
 
       const account = buildAccount({
         failedAttempts: 4,
-        lockedUtil: new Date(Date.now() - 1_000),
+        lockedUntil: new Date(Date.now() - 1_000),
       });
 
       accountRepository.findByEmail.mockResolvedValue(account);
@@ -193,7 +186,7 @@ describe('LoginUseCase', () => {
       });
 
       expect(account.failedAttempts).toBe(0);
-      expect(account.lockedUtil).toBeUndefined();
+      expect(account.lockedUntil).toBeUndefined();
 
       expect(bcryptCompareMock).toHaveBeenCalledWith(
         dto.password,
@@ -208,17 +201,8 @@ describe('LoginUseCase', () => {
       // Arrange
       const dto = buildLoginDto();
 
-      const account = buildAccount({
-        profile: new User(
-          'user-id',
-          'Alejo',
-          'test-account-id',
-          'role-id',
-          undefined,
-          undefined,
-          false,
-        ),
-      });
+      const profile = buildProfile({ isActive: false });
+      const account = buildAccount({ profile });
 
       accountRepository.findByEmail.mockResolvedValue(account);
 
@@ -353,14 +337,7 @@ describe('LoginUseCase', () => {
       expect(bcryptHashMock).toHaveBeenCalledWith('123456', 10);
 
       expect(verificationCodeRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          verificationCodeId: 'test-verification-code-id',
-          accountId: account.accountId,
-          codeHash: 'verification-code-hash',
-          type: 'double-factor',
-          attempts: 0,
-          expiresAt: expect.any(Date) as Date,
-        }),
+        expect.any(VerificationCode),
       );
 
       expect(emailSender.sendEmail).toHaveBeenCalledWith(

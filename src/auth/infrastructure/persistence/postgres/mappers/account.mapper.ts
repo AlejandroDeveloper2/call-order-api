@@ -1,32 +1,32 @@
 import { Account } from '../../../../domain/entities';
 
-import { UserMapper } from '../../../../../users/infrastructure/persistence/postgres/mappers';
-
 import { PostgresAccountSchema } from '../schemas';
 
 export class AccountMapper {
   static toDomain(schema: PostgresAccountSchema): Account {
-    return new Account(
+    const domain = new Account(
       schema.id,
       schema.email,
       schema.passwordHash,
       schema.mustChangePassword,
       schema.failedAttempts,
+      schema.profileId,
       schema.lastLoginAt,
-      schema.lockedUtil,
-      UserMapper.toDomain(schema.profile),
+      schema.lockedUntil,
     );
+    return domain;
   }
 
   static toPersistence(domain: Account): PostgresAccountSchema {
     const schema = new PostgresAccountSchema();
-    schema.id = domain.accountId;
-    schema.email = domain.email;
-    schema.passwordHash = domain.passwordHash;
-    schema.mustChangePassword = domain.mustChangePassword;
-    schema.lastLoginAt = domain.lastLoginAt;
-    schema.failedAttempts = domain.failedAttempts;
-    schema.lockedUtil = domain.lockedUtil;
+    schema.id = domain.getAccountId;
+    schema.email = domain.getEmail;
+    schema.passwordHash = domain.getPasswordHash;
+    schema.mustChangePassword = domain.getMustChangePassword;
+    schema.lastLoginAt = domain.getLastLoginAt;
+    schema.failedAttempts = domain.getFailedAttempts;
+    schema.lockedUntil = domain.getLockedUntil;
+    schema.profileId = domain.getProfileId;
     return schema;
   }
 }

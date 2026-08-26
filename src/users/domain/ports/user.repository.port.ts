@@ -6,7 +6,7 @@ import { User, UserSearchQuery } from '../entities';
 
 export abstract class UserRepositoryPort {
   abstract find(query: UserSearchQuery): Promise<PaginatedResponse<User>>;
-  abstract findByAccountId(accountId: string): Promise<User | null>;
+  abstract findById(profileId: string): Promise<User | null>;
   abstract create(user: User, context?: TransactionContext): Promise<void>;
   abstract update(
     userId: string,

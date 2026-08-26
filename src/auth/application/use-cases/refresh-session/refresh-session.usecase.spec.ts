@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { addDays } from 'date-fns';
-
-/** Entidades de dominio */
-import { Session } from '../../../domain/entities';
 
 /** Puertos */
 import {
+  ACCOUNT_REPOSITORY,
+  AccountRepositoryPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
 } from '../../../domain/ports';
@@ -18,8 +16,15 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 /** Caso de uso */
 import { RefreshSessionUseCase } from './refresh-session.usecase';
 
+/** Utilidades */
+import {
+  buildAccount,
+  buildSession,
+} from '../../../../shared/application/utils/domain-class-contructor';
+
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
+  compareSync: jest.fn(),
   hash: jest.fn(),
 }));
 
@@ -32,38 +37,22 @@ describe('RefreshSessionUseCase', () => {
   } satisfies Pick<JwtService, 'verify' | 'sign'>;
 
   const sessionRepository = {
-    findByAccountId: jest.fn(),
     update: jest.fn(),
-  } satisfies Pick<SessionRepositoryPort, 'findByAccountId' | 'update'>;
+  } satisfies Pick<SessionRepositoryPort, 'update'>;
 
+  const accountRepository = {
+    findById: jest.fn(),
+  } satisfies Pick<AccountRepositoryPort, 'findById'>;
+
+  const bcryptCompareSyncMock = jest.mocked<
+    (data: string | Buffer, encrypted: string) => boolean
+  >(bcrypt.compareSync);
   const bcryptCompareMock = jest.mocked<
     (data: string | Buffer, encrypted: string) => Promise<boolean>
   >(bcrypt.compare);
   const bcryptHashMock = jest.mocked<
     (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
   >(bcrypt.hash);
-
-  const buildSession = (overrides: Partial<Session> = {}): Session => {
-    const session = new Session(
-      'test-session-id',
-      'test-account-id',
-      'test-token-hash',
-      'test-refresh-token-hash',
-      addDays(new Date(), 1),
-      new Date(),
-      'browser',
-      'operating-system',
-      'ip-address',
-      'user-agent',
-      undefined,
-      'device-name',
-      'device-type',
-    );
-
-    Object.assign(session, overrides);
-
-    return session;
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -77,6 +66,10 @@ describe('RefreshSessionUseCase', () => {
           provide: SESSION_REPOSITORY,
           useValue: sessionRepository,
         },
+        {
+          provide: ACCOUNT_REPOSITORY,
+          useValue: accountRepository,
+        },
       ],
     }).compile();
 
@@ -86,15 +79,44 @@ describe('RefreshSessionUseCase', () => {
   });
 
   describe('run', () => {
+    it('debe lanzar AppError cuando la cuenta no existe', async () => {
+      // Arrange
+      const accountId = 'wrong-account-id';
+      const oldToken = 'test-old-wrong-token';
+      const refreshToken = 'test-refresh-token';
+
+      accountRepository.findById.mockResolvedValue(null);
+
+      // Act
+      const result = useCase.run(accountId, oldToken, refreshToken);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.accountNotFound,
+        httpCode: 404,
+      });
+
+      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      expect(sessionRepository.update).not.toHaveBeenCalled();
+      expect(jwtService.verify).not.toHaveBeenCalled();
+      expect(jwtService.sign).not.toHaveBeenCalled();
+      expect(bcryptCompareSyncMock).not.toHaveBeenCalled();
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
+      expect(bcryptHashMock).not.toHaveBeenCalled();
+    });
+
     it('debe lanzar AppError cuando la sesión no es válida', async () => {
       // Arrange
       const accountId = 'test-account-id';
       const oldToken = 'test-old-wrong-token';
       const refreshToken = 'test-refresh-token';
 
-      sessionRepository.findByAccountId.mockResolvedValue([]);
+      const session = buildSession();
+      const account = buildAccount({ sessions: [session] });
 
-      bcryptCompareMock.mockResolvedValue(false);
+      accountRepository.findById.mockResolvedValue(account);
+
+      bcryptCompareSyncMock.mockReturnValue(false);
 
       // Act
       const result = useCase.run(accountId, oldToken, refreshToken);
@@ -105,10 +127,17 @@ describe('RefreshSessionUseCase', () => {
         httpCode: 401,
       });
 
-      expect(sessionRepository.findByAccountId).toHaveBeenCalledWith(accountId);
+      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+
       expect(sessionRepository.update).not.toHaveBeenCalled();
+
       expect(jwtService.verify).not.toHaveBeenCalled();
+
       expect(jwtService.sign).not.toHaveBeenCalled();
+
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
     });
 
     it('debe lanzar AppError cuando el refresh token no es válido', async () => {
@@ -117,13 +146,12 @@ describe('RefreshSessionUseCase', () => {
       const oldToken = 'test-old-token';
       const refreshToken = 'test-wrong-refresh-token';
 
-      const session = buildSession({
-        accountId,
-        tokenHash: oldToken,
-        refreshTokenHash: refreshToken,
-      });
+      const session = buildSession();
+      const account = buildAccount({ sessions: [session] });
 
-      sessionRepository.findByAccountId.mockResolvedValue([session]);
+      accountRepository.findById.mockResolvedValue(account);
+
+      bcryptCompareSyncMock.mockReturnValue(true);
 
       bcryptCompareMock.mockResolvedValue(false);
 
@@ -136,10 +164,15 @@ describe('RefreshSessionUseCase', () => {
         httpCode: 401,
       });
 
-      expect(sessionRepository.findByAccountId).toHaveBeenCalledWith(accountId);
+      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+
       expect(sessionRepository.update).not.toHaveBeenCalled();
+
       expect(jwtService.verify).not.toHaveBeenCalled();
+
       expect(jwtService.sign).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
     });
 
     it('debe retornar el nuevo token y refresh token cuando la sesión es válida', async () => {
@@ -147,24 +180,24 @@ describe('RefreshSessionUseCase', () => {
       const accountId = 'test-account-id';
       const oldToken = 'test-old-token';
       const refreshToken = 'test-old-refresh-token';
+      const jwtPayload = {
+        accountId: 'test-account-id',
+        roleId: 'test-role-id',
+        profileId: 'test-profile-id',
+      };
 
-      const session = buildSession({
-        accountId,
-        tokenHash: oldToken,
-        refreshTokenHash: refreshToken,
-      });
+      const session = buildSession();
+      const account = buildAccount({ sessions: [session] });
 
-      sessionRepository.findByAccountId.mockResolvedValue([session]);
+      accountRepository.findById.mockResolvedValue(account);
+
+      bcryptCompareSyncMock.mockReturnValue(true);
 
       bcryptCompareMock.mockResolvedValue(true);
 
       jwtService.sign.mockReturnValue('new-token');
 
-      jwtService.verify.mockReturnValue({
-        accountId: 'test-account-id',
-        roleId: undefined,
-        profileId: undefined,
-      });
+      jwtService.verify.mockReturnValue(jwtPayload);
 
       bcryptHashMock
         .mockResolvedValueOnce('new-token-hash')
@@ -178,7 +211,7 @@ describe('RefreshSessionUseCase', () => {
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(result.refreshToken).toHaveLength(128);
 
-      expect(sessionRepository.findByAccountId).toHaveBeenCalledWith(accountId);
+      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
 
       expect(jwtService.verify).toHaveBeenCalledTimes(1);
 
@@ -188,13 +221,9 @@ describe('RefreshSessionUseCase', () => {
 
       expect(jwtService.sign).toHaveBeenCalledTimes(1);
 
-      expect(jwtService.sign).toHaveBeenCalledWith({
-        accountId: 'test-account-id',
-        roleId: undefined,
-        profileId: undefined,
-      });
+      expect(jwtService.sign).toHaveBeenCalledWith(jwtPayload);
 
-      expect(bcrypt.hash).toHaveBeenCalledTimes(2);
+      expect(bcryptHashMock).toHaveBeenCalledTimes(2);
 
       expect(sessionRepository.update).toHaveBeenCalledWith('test-session-id', {
         tokenHash: 'new-token-hash',

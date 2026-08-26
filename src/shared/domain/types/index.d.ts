@@ -20,10 +20,4 @@ interface PaginatedResponse<T> {
   totalRecords: number;
 }
 
-interface JwtPayload {
-  accountId: string;
-  roleId: string;
-  profileId: string;
-}
-
-export { ServerErrorResponse, ApiResponse, JwtPayload, PaginatedResponse };
+export { ServerErrorResponse, ApiResponse, PaginatedResponse };

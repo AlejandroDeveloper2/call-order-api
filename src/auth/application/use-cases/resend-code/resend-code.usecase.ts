@@ -1,68 +1,72 @@
-import { Inject, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { addMinutes, isBefore } from 'date-fns';
 
-/** Ports */
+/** Entidades */
+import { VerificationCode } from '../../../domain/entities';
+
+/** Puertos */
 import {
-  VERIFICATION_CODE_REPOSITORY,
+  EncryptorPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
-import {
-  EMAIL_SENDER_KEY,
-  type EmailSenderPort,
-} from '../../../../shared/domain/ports';
+import { EmailSenderPort } from '../../../../shared/domain/ports';
 
 /** Exceptions */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
-import { AppError } from '../../../../shared/domain/exceptions';
+import {
+  CodeNotExpiredYetException,
+  InvalidCodeException,
+} from '../../exceptions';
 
-/** Utilidades */
-import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
+/** Value Objects */
+import { Code, Email } from '../../../domain/value-objects';
 
-/** Dtos */
-import { ResendCodeDto } from '../../dto';
+/** Modelos de lectura */
+import { VerificationCodeValidationModel } from '../../../domain/models';
 
-@Injectable()
+/** Commands */
+import { ResendCodeCommand } from '../../commands';
+
 export class ResendCodeUseCase {
   constructor(
-    @Inject(VERIFICATION_CODE_REPOSITORY)
     private readonly verificationCodeRepository: VerificationCodeRepositoryPort,
-    @Inject(EMAIL_SENDER_KEY)
     private readonly emailSender: EmailSenderPort,
+    private readonly encryptor: EncryptorPort,
   ) {}
   /** Logica para enviar código de verificación de nuevo si el anterior expiró */
-  async run(sendCodeDto: ResendCodeDto): Promise<void> {
-    const { accountId, expiredCode, email } = sendCodeDto;
+  async run(resendCodeCommand: ResendCodeCommand): Promise<void> {
+    const { expiredCode, email } = resendCodeCommand;
 
-    const codes =
-      await this.verificationCodeRepository.findByAccountId(accountId);
+    /** Validar entradas con value objects */
+    const emailValue = Email.create(email).toString();
+    const expiredCodeValue = Code.create(expiredCode).toString();
 
-    const results = await Promise.all(
-      codes.map(async (code) => {
-        const isValid = await bcrypt.compare(expiredCode, code.codeHash);
-        return { ...code, isValid };
-      }),
-    );
+    /** Obtener la cuenta asociada al accountId proporcionado */
+    const verificationCodes =
+      await this.verificationCodeRepository.findExpiredForForwarding(
+        emailValue,
+      );
 
-    const validCode = results.find((r) => r.isValid);
+    /** Comparar el hash del código para filtrar el código de verificación actual */
+    let validCode: VerificationCodeValidationModel | null = null;
+    for (const verificationCode of verificationCodes) {
+      const isValid = await this.encryptor.compare(
+        expiredCodeValue,
+        verificationCode.codeHash,
+      );
+      if (isValid) {
+        validCode = verificationCode;
+        break;
+      }
+    }
 
     /** Validar si el código ingresado es valido*/
     if (!validCode)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidCode,
-        401,
+      throw new InvalidCodeException(
         'Código de verificación de autenticación invalido',
-        true,
       );
 
     /** Validar si el código ingresado esta expirado */
     if (isBefore(new Date(), new Date(validCode.expiresAt)))
-      throw new AppError(
-        AUTH_ERROR_CODES.codeNotExpiredYet,
-        400,
-        'El código ingresado aun no ha expirado',
-        true,
-      );
+      throw new CodeNotExpiredYetException('El código aun no ha expirado');
 
     /** Generar nuevo código y reenviarlo al correo del usuario */
     await this.generateAndResendCode({
@@ -78,12 +82,18 @@ export class ResendCodeUseCase {
     email: string;
   }) {
     const { oldVerficationCodeId, attempts, email } = payload;
+
     /** Generar un nuevo código de verificación */
-    const code = generateVerificationCode();
-    const codeHash = await bcrypt.hash(code, 10);
+    const code = VerificationCode.generate();
+
+    /** Validar con el value object */
+    const codeValue = Code.create(code).toString();
+
+    /** Generar el hash para el nuevo código */
+    const codeHash = await this.encryptor.hash(codeValue, 20);
 
     /** Actualizar a nivel de base de datos el valor del nuevo código */
-    await this.verificationCodeRepository.update(oldVerficationCodeId, {
+    await this.verificationCodeRepository.refresh(oldVerficationCodeId, {
       attempts: attempts + 1,
       codeHash,
       expiresAt: addMinutes(new Date(), 10),
@@ -92,7 +102,7 @@ export class ResendCodeUseCase {
     await this.emailSender.sendEmail(
       email,
       'Código de verificación de CallOrder',
-      this.buildVerificationEmail(code),
+      this.buildVerificationEmail(codeValue),
     );
   }
 

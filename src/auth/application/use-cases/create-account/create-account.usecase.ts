@@ -1,75 +1,75 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
-import * as bcrypt from 'bcrypt';
-
 /** Entidades de dominio */
 import { Account } from '../../../domain/entities';
 import { User } from '../../../../users/domain/entities';
 
+/** Value Objects */
+import { Email, Password } from '../../../domain/value-objects';
+
 /** Puertos */
+import { AccountRepositoryPort, EncryptorPort } from '../../../domain/ports';
+import { UserRepositoryPort } from '../../../../users/domain/ports';
+
 import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-} from '../../../domain/ports';
-import {
-  USER_REPOSITORY,
-  UserRepositoryPort,
-} from '../../../../users/domain/ports';
-import {
-  TRANSACTION_MANAGER,
-  type TransactionManagerPort,
+  IdGeneratorPort,
+  TransactionManagerPort,
 } from '../../../../shared/domain/ports';
+
 /** Errores de dominio */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { AccountAlreadyExistsException } from '../../exceptions';
 
 /** Dtos */
-import { CreateAccountDto } from '../../dto';
+import { CreateAccountCommand } from '../../commands';
 
-@Injectable()
 export class CreateAccountUseCase {
   constructor(
-    @Inject(ACCOUNT_REPOSITORY)
     private readonly accountRepository: AccountRepositoryPort,
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepositoryPort,
-    @Inject(TRANSACTION_MANAGER)
     private readonly transactionManager: TransactionManagerPort,
+    private readonly encryptor: EncryptorPort,
+    private readonly idGenerator: IdGeneratorPort,
   ) {}
 
-  async run(createAccountDto: CreateAccountDto): Promise<void> {
-    const { fullname, phone, email, password, roleId } = createAccountDto;
+  async run(createAccountCommand: CreateAccountCommand): Promise<void> {
+    const email = Email.create(createAccountCommand.email).toString();
+    const password = Password.create(createAccountCommand.password).toString();
+
     /** Validar si existe otra cuenta asociada con el correo ingresado */
-    const account = await this.accountRepository.findByEmail(email);
+    const accountExists = await this.accountRepository.verifyByEmail(email);
 
-    if (account)
-      throw new AppError(
-        AUTH_ERROR_CODES.accountAlreadyExists,
-        409,
+    if (accountExists)
+      throw new AccountAlreadyExistsException(
         'Ya existe una cuenta asociada con el correo ingresado',
-        true,
       );
 
-    /** Generar uuid de cuenta y hash de la contraseña de acceso */
-    const accountId = uuidv4();
-    const passwordHash = await bcrypt.hash(password, 10);
+    /** Generar id único de cuenta y usuario */
+    const accountId = this.idGenerator.generate();
+    const userId = this.idGenerator.generate();
 
-    /** Crear la cuenta y el perfil en una transacción agnóstica */
-    const newAccount = new Account(accountId, email, passwordHash, false, 0);
+    /** Generar hash de contraseña */
+    const passwordHash = await this.encryptor.hash(password, 10);
 
+    /** Crear las instancias de dominio de la cuenta y el usuario */
+    const user = User.create(
+      userId,
+      createAccountCommand.fullname,
+      createAccountCommand.roleId,
+      undefined,
+      createAccountCommand.phone,
+    );
+
+    const account = Account.create(
+      accountId,
+      email,
+      passwordHash,
+      false,
+      0,
+      userId,
+    );
+
+    /** Crear cuenta y usuario en una transacción agnóstica */
     await this.transactionManager.run(async (context) => {
-      await this.accountRepository.create(newAccount, context);
-
-      const userId = uuidv4();
-      const user = new User(
-        userId,
-        fullname,
-        accountId,
-        roleId,
-        undefined,
-        phone,
-      );
       await this.userRepository.create(user, context);
+      await this.accountRepository.create(account, context);
     });
   }
 }

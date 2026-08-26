@@ -1,16 +1,69 @@
 import { VerificationCodeType } from '../types';
 
-import { Account } from './account.entity';
-
 export class VerificationCode {
   constructor(
-    public readonly verificationCodeId: string,
-    public readonly accountId: string,
-    public codeHash: string,
-    public type: VerificationCodeType,
-    public expiresAt: Date,
-    public attempts: number,
-    public usedAt?: Date,
-    public account?: Account,
+    private readonly verificationCodeId: string,
+    private codeHash: string,
+    private type: VerificationCodeType,
+    private expiresAt: Date,
+    private attempts: number,
+    private readonly accountId: string,
+    private usedAt?: Date,
   ) {}
+
+  static create(
+    verificationCodeId: string,
+    codeHash: string,
+    type: VerificationCodeType,
+    expiresAt: Date,
+    attempts: number,
+    accountId: string,
+    usedAt?: Date,
+  ): VerificationCode {
+    return new VerificationCode(
+      verificationCodeId,
+      codeHash,
+      type,
+      expiresAt,
+      attempts,
+      accountId,
+      usedAt,
+    );
+  }
+
+  static generate(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  incrementAttempts(): void {
+    this.attempts = this.attempts + 1;
+  }
+
+  get getVerificationCodeId(): string {
+    return this.verificationCodeId;
+  }
+
+  get getCodeHash(): string {
+    return this.codeHash;
+  }
+
+  get getType(): VerificationCodeType {
+    return this.type;
+  }
+
+  get getExpiresAt(): Date {
+    return this.expiresAt;
+  }
+
+  get getAttempts(): number {
+    return this.attempts;
+  }
+
+  get getAccountId(): string {
+    return this.accountId;
+  }
+
+  get getUsedAt(): Date | undefined {
+    return this.usedAt;
+  }
 }

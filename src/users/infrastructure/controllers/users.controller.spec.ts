@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { User } from '../../domain/entities';
 
 import {
-  FindUserByAccountUseCase,
+  FindUserByIdUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
   UpdateUserAvatarUseCase,
@@ -21,9 +21,9 @@ import { CloudinaryAdpater } from '../../../shared/infrastructure/adapters';
 describe('UsersController', () => {
   let controller: UsersController;
 
-  const mockFindUserByAccountUseCase = {
+  const mockFindUserByIdUseCase = {
     run: jest.fn(),
-  } satisfies Pick<FindUserByAccountUseCase, 'run'>;
+  } satisfies Pick<FindUserByIdUseCase, 'run'>;
 
   const mockFindUsersUseCase = {
     run: jest.fn(),
@@ -54,8 +54,8 @@ describe('UsersController', () => {
           useValue: mockCloudinaryAdapter,
         },
         {
-          provide: FindUserByAccountUseCase,
-          useValue: mockFindUserByAccountUseCase,
+          provide: FindUserByIdUseCase,
+          useValue: mockFindUserByIdUseCase,
         },
         { provide: FindUsersUseCase, useValue: mockFindUsersUseCase },
         { provide: UpdateProfileUseCase, useValue: mockUpdateProfileUseCase },
@@ -81,21 +81,21 @@ describe('UsersController', () => {
     });
   });
 
-  describe('getByAccountId', () => {
-    it('debe delegar los datos al getByAccpuntId y retornar su resultado', async () => {
+  describe('getUserById', () => {
+    it('debe delegar los datos al getUserById y retornar su resultado', async () => {
       //Arrange
-      const accountId: string = 'test-account-id';
+      const userId: string = 'test-user-id';
 
       const expectedResult = expect.any(User) as User;
 
-      mockFindUserByAccountUseCase.run.mockResolvedValue(expectedResult);
+      mockFindUserByIdUseCase.run.mockResolvedValue(expectedResult);
 
       //Act
-      const result = await controller.getByAccountId(accountId);
+      const result = await controller.getUserById(userId);
 
       //Assert
-      expect(mockFindUserByAccountUseCase.run).toHaveBeenCalledTimes(1);
-      expect(mockFindUserByAccountUseCase.run).toHaveBeenCalledWith(accountId);
+      expect(mockFindUserByIdUseCase.run).toHaveBeenCalledTimes(1);
+      expect(mockFindUserByIdUseCase.run).toHaveBeenCalledWith(userId);
       expect(result).toBe(expectedResult);
     });
   });

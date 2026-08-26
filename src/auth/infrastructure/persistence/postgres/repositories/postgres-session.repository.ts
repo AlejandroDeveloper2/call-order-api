@@ -4,17 +4,26 @@ import { EntityManager, Repository } from 'typeorm';
 
 /** Entidad de dominio */
 import { Session } from '../../../../domain/entities';
-import { UpdateSessionInput } from '../../../../domain/types';
+
 /** Puertos */
 import { SessionRepositoryPort } from '../../../../domain/ports';
 import { TransactionContext } from '../../../../../shared/domain/ports';
-/** Utilidades */
-import { handleServerError } from '../../../../../shared/domain/utils/handleServerError';
+
+/** Errores */
+import { PersistenceException } from '../../../../../shared/infrastructure/exceptions';
+
+/** Modelos de lectura */
+import {
+  SessionToUpdateModel,
+  SessionValidationModel,
+} from '../../../../domain/models';
 
 /** Esquemas */
 import { PostgresSessionSchema } from '../schemas';
+
 /** Mappers */
 import { SessionMapper } from '../mappers';
+
 /**Adapters */
 import { TypeOrmTransactionContext } from '../../../../../shared/infrastructure/adapters';
 
@@ -23,7 +32,7 @@ export class PostgresSessionRepository implements SessionRepositoryPort {
   constructor(
     @InjectRepository(PostgresSessionSchema)
     private readonly sessionRepository: Repository<PostgresSessionSchema>,
-  ) { }
+  ) {}
 
   private resolveManager(context?: TransactionContext): EntityManager {
     if (context instanceof TypeOrmTransactionContext) {
@@ -33,44 +42,108 @@ export class PostgresSessionRepository implements SessionRepositoryPort {
     return this.sessionRepository.manager;
   }
 
-  async findByAccountId(accountId: string): Promise<Session[]> {
+  async findActiveForValidation(
+    accountId: string,
+  ): Promise<SessionValidationModel | null> {
     try {
-      const qb = this.sessionRepository
-        .createQueryBuilder()
-        .select()
-        .where('accountId = :accountId', { accountId })
-        .andWhere('revokedAt IS NULL');
+      const result = await this.sessionRepository
+        .createQueryBuilder('session')
+        .innerJoin('session.account', 'account')
+        .select([
+          'session.id',
+          'session.tokenHash',
+          'session.revokedAt',
+          'account.id',
+        ])
+        .where('account.id = :accountId', { accountId })
+        .andWhere('session.revokedAt IS NULL')
+        .getOne();
 
-      const schemas = await qb.getMany();
+      if (!result) return null;
 
-      return schemas.map((schema) => SessionMapper.toDomain(schema));
+      return { sessionId: result.id, tokenHash: result.tokenHash };
     } catch (error: unknown) {
-      return handleServerError(error);
+      const e = error as Error;
+      throw new PersistenceException(e.message);
     }
   }
+
+  async findActiveToUpdate(
+    accountId: string,
+  ): Promise<SessionToUpdateModel | null> {
+    try {
+      const result = await this.sessionRepository
+        .createQueryBuilder('session')
+        .innerJoin('session.account', 'account')
+        .select([
+          'session.id',
+          'session.tokenHash',
+          'session.refreshTokenHash',
+          'session.revokedAt',
+          'account.id',
+        ])
+        .where('account.id = :accountId', { accountId })
+        .andWhere('session.revokedAt IS NULL')
+        .getOne();
+
+      if (!result) return null;
+
+      return {
+        sessionId: result.id,
+        tokenHash: result.tokenHash,
+        refreshTokenHash: result.refreshTokenHash,
+      };
+    } catch (error: unknown) {
+      const e = error as Error;
+      throw new PersistenceException(e.message);
+    }
+  }
+
   async create(session: Session, context?: TransactionContext): Promise<void> {
     try {
       const manager = this.resolveManager(context);
       const schema = SessionMapper.toPersistence(session);
       await manager.save(schema);
     } catch (error: unknown) {
-      return handleServerError(error);
+      const e = error as Error;
+      throw new PersistenceException(e.message);
     }
   }
-  async update(
+
+  async revoke(sessionId: string): Promise<number> {
+    try {
+      const result = await this.sessionRepository.update(
+        { id: sessionId },
+        { revokedAt: new Date() },
+      );
+      return result.affected || 0;
+    } catch (error: unknown) {
+      const e = error as Error;
+      throw new PersistenceException(e.message);
+    }
+  }
+
+  async refresh(
     sessionId: string,
-    updateSessionInput: UpdateSessionInput,
+    payload: {
+      tokenHash: string;
+      refreshTokenHash: string;
+      lastActivityAt: Date;
+      expiresAt: Date;
+    },
   ): Promise<number> {
     try {
       const result = await this.sessionRepository.update(
         { id: sessionId },
-        { ...updateSessionInput },
+        payload,
       );
       return result.affected || 0;
     } catch (error: unknown) {
-      return handleServerError(error);
+      const e = error as Error;
+      throw new PersistenceException(e.message);
     }
   }
+
   async revokeByAccountId(
     accountId: string,
     revokedAt: Date,
@@ -90,7 +163,8 @@ export class PostgresSessionRepository implements SessionRepositoryPort {
       const result = await qb.execute();
       return result.affected || 0;
     } catch (error: unknown) {
-      return handleServerError(error);
+      const e = error as Error;
+      throw new PersistenceException(e.message);
     }
   }
 }

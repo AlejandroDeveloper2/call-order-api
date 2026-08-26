@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 
-/**Entidades de dominio */
-import { Account } from '../../../domain/entities';
-
 /** Puertos */
 import {
   ACCOUNT_REPOSITORY,
@@ -17,7 +14,10 @@ import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 import { ChangePasswordUseCase } from './change-password.usecase';
 
 /** Dtos */
-import { ChangePasswordDto } from '../../dto';
+import { ChangePasswordDto } from '../../../infrastructure/dto';
+
+/** Utilidades */
+import { buildAccount } from '../../../../shared/application/utils/domain-class-contructor';
 
 jest.mock('bcrypt');
 
@@ -83,13 +83,7 @@ describe('ChangePasswordUseCase', () => {
       //Arrange
       const accountId = 'test-account-id';
 
-      const account = new Account(
-        'test-account-id',
-        'account_email@gmail.com',
-        'password_hash',
-        false,
-        0,
-      );
+      const account = buildAccount();
 
       accountRepository.findById.mockResolvedValue(account);
 
@@ -120,13 +114,7 @@ describe('ChangePasswordUseCase', () => {
       //Arrange
       const accountId = 'test-account-id';
 
-      const account = new Account(
-        'test-account-id',
-        'account_email@gmail.com',
-        'password_hash',
-        false,
-        0,
-      );
+      const account = buildAccount();
 
       accountRepository.findById.mockResolvedValue(account);
 

@@ -2,11 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { addMinutes } from 'date-fns';
 
-/** Entidades */
-import { VerificationCode } from '../../../domain/entities';
-
 /** Ports */
 import {
+  ACCOUNT_REPOSITORY,
+  AccountRepositoryPort,
   VERIFICATION_CODE_REPOSITORY,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
@@ -19,16 +18,20 @@ import {
 import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
 
 /** DTO */
-import { ResendCodeDto } from '../../dto';
+import { ResendCodeDto } from '../../../infrastructure/dto';
 
 /** Use case */
 import { ResendCodeUseCase } from './resend-code.usecase';
 
 /** Utils */
 import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
+import {
+  buildAccount,
+  buildVerificationCode,
+} from '../../../../shared/application/utils/domain-class-contructor';
 
 jest.mock('bcrypt', () => ({
-  compare: jest.fn(),
+  compareSync: jest.fn(),
   hash: jest.fn(),
 }));
 
@@ -39,39 +42,30 @@ jest.mock('../../../domain/utils/generate-validation-code', () => ({
 describe('ResendCodeUseCase', () => {
   let useCase: ResendCodeUseCase;
 
+  const accountRepository = {
+    findById: jest.fn(),
+  } satisfies Pick<AccountRepositoryPort, 'findById'>;
+
   const verificationCodeRepository = {
-    findByAccountId: jest.fn(),
     update: jest.fn(),
-  } satisfies Pick<
-    VerificationCodeRepositoryPort,
-    'findByAccountId' | 'update'
-  >;
+  } satisfies Pick<VerificationCodeRepositoryPort, 'update'>;
 
   const emailSender = {
     sendEmail: jest.fn(),
   } satisfies Pick<EmailSenderPort, 'sendEmail'>;
 
+  const bcryptHashMock = jest.mocked<
+    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
+  >(bcrypt.hash);
+
+  const bcryptCompareMock = jest.mocked<
+    (data: string | Buffer, encrypted: string) => boolean
+  >(bcrypt.compareSync);
+
   const dto: ResendCodeDto = {
-    accountId: 'account-1',
+    accountId: 'test-account-id',
     email: 'test@gmail.com',
     expiredCode: '123456',
-  };
-
-  const buildVerificationCode = (
-    overrides: Partial<VerificationCode> = {},
-  ): VerificationCode => {
-    const verificationCode = new VerificationCode(
-      'verification-code-id',
-      dto.accountId,
-      'code-hash',
-      'double-factor',
-      addMinutes(new Date(), 10),
-      0,
-    );
-
-    Object.assign(verificationCode, overrides);
-
-    return verificationCode;
   };
 
   beforeEach(async () => {
@@ -80,6 +74,10 @@ describe('ResendCodeUseCase', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResendCodeUseCase,
+        {
+          provide: ACCOUNT_REPOSITORY,
+          useValue: accountRepository,
+        },
         {
           provide: VERIFICATION_CODE_REPOSITORY,
           useValue: verificationCodeRepository,
@@ -95,97 +93,114 @@ describe('ResendCodeUseCase', () => {
   });
 
   describe('run()', () => {
-    it('debe lanzar AppError cuando el código ingresado no es válido', async () => {
-      const wrongVerificationCode = buildVerificationCode({
-        codeHash: 'wrong-code-hash',
+    it('debe lanzar AppError cuando la cuenta no exista', async () => {
+      // Arrange
+      accountRepository.findById.mockResolvedValue(null);
+
+      // Act
+      const result = useCase.run({ ...dto, accountId: 'wrong-account-id' });
+
+      //Assert
+      await expect(result).rejects.toMatchObject({
+        name: AUTH_ERROR_CODES.accountNotFound,
+        httpCode: 404,
       });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        wrongVerificationCode,
-      ]);
+      expect(accountRepository.findById).toHaveBeenCalledWith(
+        'wrong-account-id',
+      );
 
-      jest
-        .mocked<(data: string | Buffer, encrypted: string) => Promise<boolean>>(
-          bcrypt.compare,
-        )
-        .mockResolvedValue(false);
+      expect(bcryptCompareMock).not.toHaveBeenCalled();
 
-      await expect(useCase.run(dto)).rejects.toMatchObject({
+      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
+
+      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar AppError cuando el código ingresado no es válido', async () => {
+      // Arrange
+      const account = buildAccount();
+
+      accountRepository.findById.mockResolvedValue(account);
+
+      bcryptCompareMock.mockReturnValue(false);
+
+      // Act
+      const result = useCase.run(dto);
+
+      //Assert
+      await expect(result).rejects.toMatchObject({
         name: AUTH_ERROR_CODES.invalidCode,
         httpCode: 401,
       });
 
-      expect(verificationCodeRepository.findByAccountId).toHaveBeenCalledWith(
-        dto.accountId,
-      );
+      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
 
       expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
 
       expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
 
     it('debe lanzar AppError cuando el código aun no ha expirado', async () => {
+      // Arrange
       const verificationCode = buildVerificationCode();
+      const account = buildAccount({ verificationCodes: [verificationCode] });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        verificationCode,
-      ]);
-      jest
-        .mocked<(data: string | Buffer, encrypted: string) => Promise<boolean>>(
-          bcrypt.compare,
-        )
-        .mockResolvedValue(true);
+      accountRepository.findById.mockResolvedValue(account);
 
-      await expect(useCase.run(dto)).rejects.toMatchObject({
+      bcryptCompareMock.mockReturnValue(true);
+
+      //Act
+      const result = useCase.run(dto);
+
+      // Assert
+      await expect(result).rejects.toMatchObject({
         name: AUTH_ERROR_CODES.codeNotExpiredYet,
         httpCode: 400,
       });
 
-      expect(verificationCodeRepository.findByAccountId).toHaveBeenCalledWith(
-        dto.accountId,
-      );
+      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
 
       expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+
+      expect(bcryptHashMock).not.toHaveBeenCalled();
 
       expect(emailSender.sendEmail).not.toHaveBeenCalled();
     });
 
     it('debe generar y actualizar un nuevo código cuando el código ingresado es válido y ya ha expirado', async () => {
+      //Arrange
       const verificationCode = buildVerificationCode({
         expiresAt: addMinutes(new Date(), -5),
       });
+      const account = buildAccount({ verificationCodes: [verificationCode] });
 
-      verificationCodeRepository.findByAccountId.mockResolvedValue([
-        verificationCode,
-      ]);
+      accountRepository.findById.mockResolvedValue(account);
 
-      jest
-        .mocked<(data: string | Buffer, encrypted: string) => Promise<boolean>>(
-          bcrypt.compare,
-        )
-        .mockResolvedValue(true);
-      jest
-        .mocked<
-          (
-            data: string | Buffer,
-            saltOrRounds: string | number,
-          ) => Promise<string>
-        >(bcrypt.hash)
-        .mockResolvedValue('new-hashed-code');
+      bcryptCompareMock.mockReturnValue(true);
+
+      bcryptHashMock.mockResolvedValue('new-hashed-code');
+
       jest.mocked(generateVerificationCode).mockReturnValue('654321');
 
       verificationCodeRepository.update.mockResolvedValue(1);
       emailSender.sendEmail.mockResolvedValue(undefined);
 
-      await expect(useCase.run(dto)).resolves.toBeUndefined();
+      //Act
+      const result = await useCase.run(dto);
 
-      expect(verificationCodeRepository.findByAccountId).toHaveBeenCalledWith(
-        dto.accountId,
-      );
+      // Assert
+      expect(result).toBeUndefined();
+
+      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
 
       expect(generateVerificationCode).toHaveBeenCalledTimes(1);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('654321', 10);
+      expect(bcryptHashMock).toHaveBeenCalledWith('654321', 10);
 
       expect(verificationCodeRepository.update).toHaveBeenCalledTimes(1);
 

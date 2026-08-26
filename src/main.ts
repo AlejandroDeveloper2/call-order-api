@@ -35,6 +35,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       exceptionFactory: (errors: ValidationError[]) => {
+        console.log(errors);
         const messages = errors
           .flatMap((error) => Object.values(error.constraints ?? {}))
           .join('; ');

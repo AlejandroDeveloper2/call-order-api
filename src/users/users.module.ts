@@ -6,7 +6,7 @@ import { PERMISSION_REPOSITORY, USER_REPOSITORY } from './domain/ports';
 
 /** Casos de uso */
 import {
-  FindUserByAccountUseCase,
+  FindUserByIdUseCase,
   FindUsersUseCase,
   UpdateProfileUseCase,
   UpdateUserAvatarUseCase,
@@ -47,7 +47,7 @@ import { SharedModule } from '../shared/shared.module';
   ],
   controllers: [UsersController],
   providers: [
-    FindUserByAccountUseCase,
+    FindUserByIdUseCase,
     FindUsersUseCase,
     UpdateProfileUseCase,
     UpdateUserStatusUseCase,
@@ -57,4 +57,4 @@ import { SharedModule } from '../shared/shared.module';
   ],
   exports: [USER_REPOSITORY, PERMISSION_REPOSITORY],
 })
-export class UsersModule { }
+export class UsersModule {}

@@ -1,28 +1,27 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import crypto from 'crypto';
 import { addDays } from 'date-fns';
 
 /** Puertos */
 import {
-  SESSION_REPOSITORY,
+  AccessTokenGeneratorPort,
+  AccessTokenVerifierPort,
+  EncryptorPort,
+  RefreshTokenGeneratorPort,
   SessionRepositoryPort,
 } from '../../../domain/ports';
 
 /** Errores */
-import { AppError } from '../../../../shared/domain/exceptions';
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+import { InvalidSessionException } from '../../exceptions';
 
-/** Tipos */
-import { JwtPayload } from '../../../../shared/domain/types';
+/** Value Objects */
+import { JwtAccessToken, RefreshToken } from '../../../domain/value-objects';
 
-@Injectable()
 export class RefreshSessionUseCase {
   constructor(
-    private readonly tokenService: JwtService,
-    @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: SessionRepositoryPort,
+    private readonly encryptor: EncryptorPort,
+    private readonly accessTokenGenerator: AccessTokenGeneratorPort,
+    private readonly accessTokenVerifier: AccessTokenVerifierPort,
+    private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
   ) {}
 
   async run(
@@ -30,63 +29,59 @@ export class RefreshSessionUseCase {
     oldToken: string,
     refreshToken: string,
   ): Promise<{ token: string; refreshToken: string }> {
-    /** Obtener las sessiones activas asociadas a la cuenta  */
-    const sessions = await this.sessionRepository.findByAccountId(accountId);
+    /**  Obtener las sesiones activas por ID de cuenta proporcionado */
+    const session = await this.sessionRepository.findActiveToUpdate(accountId);
+
+    /** Validar los token con los value Object respectivos */
+    const tokenValue = JwtAccessToken.create(oldToken).toString();
+    const refreshTokenValue = RefreshToken.create(refreshToken).toString();
+
+    if (!session) throw new InvalidSessionException('Sesión invalida');
 
     /** Comparar el hash del token para filtrar la sesión actual */
-    const results = await Promise.all(
-      sessions.map(async (session) => {
-        const isValid = await bcrypt.compare(oldToken, session.tokenHash);
-        return { ...session, isValid };
-      }),
-    );
-
-    const validSession = results.find((r) => r.isValid);
+    const isValid = await this.encryptor.compare(tokenValue, session.tokenHash);
 
     /** Validar si la sesión es valida */
-    if (!validSession)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidSession,
-        401,
-        'Sesión invalida',
-        true,
-      );
+    if (!isValid) throw new InvalidSessionException('Sesión invalida');
 
     /** Validar si el refresh token es valido */
-    const isValidRefreshToken = await bcrypt.compare(
-      refreshToken,
-      validSession.refreshTokenHash,
+    const isValidRefreshToken = await this.encryptor.compare(
+      refreshTokenValue,
+      session.refreshTokenHash,
     );
 
     if (!isValidRefreshToken)
-      throw new AppError(
-        AUTH_ERROR_CODES.invalidSession,
-        401,
-        'Refresh Token invalido',
-        true,
-      );
+      throw new InvalidSessionException('Refresh Token invalido');
 
     /** Obtener el payload del token para crear uno nuevo */
-    const oldPayload: JwtPayload = this.tokenService.verify(oldToken, {
-      ignoreExpiration: true,
-    });
+    const oldPayload = await this.accessTokenVerifier.verify(tokenValue);
 
     /** Generar nuevo token preservando el payload original */
-    const newToken: string = this.tokenService.sign({
+    const newToken: string = await this.accessTokenGenerator.generate({
       accountId: oldPayload.accountId,
       roleId: oldPayload.roleId,
       profileId: oldPayload.profileId,
     });
 
+    /** Validar con el value object */
+    const newTokenValue = JwtAccessToken.create(newToken).toString();
+
     /** Generar nuevo refresh token */
-    const newRefreshToken: string = this.generateRefreshToken();
+    const newRefreshToken: string = this.refreshTokenGenerator.generate();
+
+    /** Validar con el value object */
+    const newRefreshTokenValue =
+      RefreshToken.create(newRefreshToken).toString();
 
     /** Encriptar el nuevo token y refresh token */
-    const newTokenHash: string = await bcrypt.hash(newToken, 10);
-    const newRefreshTokenHash: string = await bcrypt.hash(newRefreshToken, 10);
+    const newTokenHash: string = await this.encryptor.hash(newTokenValue, 20);
+    const newRefreshTokenHash: string = await this.encryptor.hash(
+      newRefreshTokenValue,
+      20,
+    );
 
-    /** Actualizar la sesión con el nuevo token y refresh token */
-    await this.sessionRepository.update(validSession.sessionId, {
+    /** Actualizar la sesión con el nuevo token, refresh token , última actividad y tiempo de expiración */
+    await this.sessionRepository.refresh(session.sessionId, {
       tokenHash: newTokenHash,
       refreshTokenHash: newRefreshTokenHash,
       lastActivityAt: new Date(),
@@ -94,12 +89,8 @@ export class RefreshSessionUseCase {
     });
 
     return {
-      token: newToken,
-      refreshToken: newRefreshToken,
+      token: newTokenValue,
+      refreshToken: newRefreshTokenValue,
     };
-  }
-
-  private generateRefreshToken(): string {
-    return crypto.randomBytes(64).toString('hex');
   }
 }

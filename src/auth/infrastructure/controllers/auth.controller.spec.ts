@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
 
+/** Entidades */
+import { Role } from '../../../users/domain/entities';
+
 /** Controller */
 import { AuthController } from './auth.controller';
 
@@ -27,7 +30,7 @@ import {
   UpdateEmailDto,
   ValidateIdentityDto,
   UpdatePasswordDto,
-} from '../../application/dto';
+} from '../dto';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'test-verification-code-id'),
@@ -208,7 +211,7 @@ describe('AuthController', () => {
         password: 'Diego123@',
         fullname: 'Diego Diaz',
         phone: '3105073199',
-        roleId: 'role-test-id',
+        role: new Role('role-test-id', 'role-name'),
       };
 
       const expectedResult = undefined;
