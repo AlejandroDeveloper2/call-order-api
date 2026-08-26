@@ -17,11 +17,15 @@ import {
 
 /** Puertos */
 import {
+  ACCESS_TOKEN_GENERATOR,
+  ACCESS_TOKEN_VERIFIER,
   AccessTokenGeneratorPort,
   AccessTokenVerifierPort,
   ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
+  ENCRYPTOR,
   EncryptorPort,
+  REFRESH_TOKEN_GENERATOR,
   RefreshTokenGeneratorPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
@@ -56,7 +60,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new ChangePasswordUseCase(accountRepository, encryptor);
     },
 
-    inject: [ACCOUNT_REPOSITORY, EncryptorPort],
+    inject: [ACCOUNT_REPOSITORY, ENCRYPTOR],
   },
 
   {
@@ -82,7 +86,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       ACCOUNT_REPOSITORY,
       USER_REPOSITORY,
       TRANSACTION_MANAGER,
-      EncryptorPort,
+      ENCRYPTOR,
       ID_GENERATOR_KEY,
     ],
   },
@@ -109,7 +113,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       ACCOUNT_REPOSITORY,
       VERIFICATION_CODE_REPOSITORY,
       EMAIL_SENDER_KEY,
-      EncryptorPort,
+      ENCRYPTOR,
       ID_GENERATOR_KEY,
     ],
   },
@@ -123,7 +127,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new LogoutUseCase(sessionRepository, encryptor);
     },
 
-    inject: [SESSION_REPOSITORY, EncryptorPort],
+    inject: [SESSION_REPOSITORY, ENCRYPTOR],
   },
   {
     provide: RefreshSessionUseCase,
@@ -146,10 +150,10 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
 
     inject: [
       SESSION_REPOSITORY,
-      EncryptorPort,
-      AccessTokenGeneratorPort,
-      AccessTokenVerifierPort,
-      RefreshTokenGeneratorPort,
+      ENCRYPTOR,
+      ACCESS_TOKEN_GENERATOR,
+      ACCESS_TOKEN_VERIFIER,
+      REFRESH_TOKEN_GENERATOR,
     ],
   },
 
@@ -168,7 +172,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       );
     },
 
-    inject: [VERIFICATION_CODE_REPOSITORY, EMAIL_SENDER_KEY, EncryptorPort],
+    inject: [VERIFICATION_CODE_REPOSITORY, EMAIL_SENDER_KEY, ENCRYPTOR],
   },
 
   {
@@ -191,7 +195,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       return new UpdatePasswordUseCase(accountRepository, encryptor);
     },
 
-    inject: [ACCOUNT_REPOSITORY, EncryptorPort],
+    inject: [ACCOUNT_REPOSITORY, ENCRYPTOR],
   },
 
   {
@@ -225,9 +229,9 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       SESSION_REPOSITORY,
       TRANSACTION_MANAGER,
       ID_GENERATOR_KEY,
-      EncryptorPort,
-      AccessTokenGeneratorPort,
-      RefreshTokenGeneratorPort,
+      ENCRYPTOR,
+      ACCESS_TOKEN_GENERATOR,
+      REFRESH_TOKEN_GENERATOR,
     ],
   },
 
@@ -246,7 +250,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       );
     },
 
-    inject: [SESSION_REPOSITORY, EncryptorPort, AccessTokenVerifierPort],
+    inject: [SESSION_REPOSITORY, ENCRYPTOR, ACCESS_TOKEN_VERIFIER],
   },
   {
     provide: ValidateAccessTokenUseCase,

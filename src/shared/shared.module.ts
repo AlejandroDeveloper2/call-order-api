@@ -12,6 +12,7 @@ import { CloudinaryUploadInterceptor } from './infrastructure/interceptors';
 
 import {
   EMAIL_SENDER_KEY,
+  FILE_UPLOADER,
   ID_GENERATOR_KEY,
   TRANSACTION_MANAGER,
 } from './domain/ports';
@@ -24,7 +25,10 @@ import {
       provide: TRANSACTION_MANAGER,
       useClass: TypeOrmTransactionManagerAdapter,
     },
-    CloudinaryAdpater,
+    {
+      provide: FILE_UPLOADER,
+      useClass: CloudinaryAdpater,
+    },
     CloudinaryUploadInterceptor,
     {
       provide: ID_GENERATOR_KEY,
@@ -32,12 +36,9 @@ import {
     },
   ],
   exports: [
-    { provide: EMAIL_SENDER_KEY, useClass: NodeMailerAdapter },
-    {
-      provide: TRANSACTION_MANAGER,
-      useClass: TypeOrmTransactionManagerAdapter,
-    },
-    CloudinaryAdpater,
+    EMAIL_SENDER_KEY,
+    TRANSACTION_MANAGER,
+    FILE_UPLOADER,
     CloudinaryUploadInterceptor,
     ID_GENERATOR_KEY,
   ],

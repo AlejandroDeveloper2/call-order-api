@@ -3,9 +3,13 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Inject,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { UploadApiResponse } from 'cloudinary';
+
+/** Puertos */
+import { FILE_UPLOADER } from '../../domain/ports';
 
 /** Excepciones de dominio */
 import { FileNotProvidedException, FileUploadException } from '../exceptions';
@@ -23,7 +27,10 @@ export class CloudinaryUploadInterceptor<T = any> implements NestInterceptor<
   T,
   any
 > {
-  constructor(private readonly cloudinaryAdapter: CloudinaryAdpater) {}
+  constructor(
+    @Inject(FILE_UPLOADER)
+    private readonly cloudinaryAdapter: CloudinaryAdpater,
+  ) {}
 
   async intercept(
     context: ExecutionContext,

@@ -8,3 +8,5 @@ export abstract class EncryptorPort {
     saltOrRounds: string | number,
   ) => Promise<string>;
 }
+
+export const ENCRYPTOR = Symbol('ENCRYPTOR');

@@ -1,10 +1,10 @@
 import { Provider } from '@nestjs/common';
 
 import {
-  EncryptorPort,
-  AccessTokenGeneratorPort,
-  RefreshTokenGeneratorPort,
-  AccessTokenVerifierPort,
+  ENCRYPTOR,
+  ACCESS_TOKEN_GENERATOR,
+  ACCESS_TOKEN_VERIFIER,
+  REFRESH_TOKEN_GENERATOR,
 } from '../../domain/ports';
 
 import {
@@ -16,22 +16,22 @@ import {
 
 export const AUTH_SECURITY_PROVIDERS: Provider[] = [
   {
-    provide: EncryptorPort,
+    provide: ENCRYPTOR,
     useClass: BcryptAdapter,
   },
 
   {
-    provide: AccessTokenGeneratorPort,
+    provide: ACCESS_TOKEN_GENERATOR,
     useClass: JwtAccessTokenGeneratorAdapter,
   },
 
   {
-    provide: AccessTokenVerifierPort,
+    provide: ACCESS_TOKEN_VERIFIER,
     useClass: JwtAccessTokenVerifierAdapter,
   },
 
   {
-    provide: RefreshTokenGeneratorPort,
+    provide: REFRESH_TOKEN_GENERATOR,
     useClass: CryptoRefreshTokenGeneratorAdapter,
   },
 ];
