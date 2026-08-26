@@ -80,7 +80,7 @@ export class AuthController {
   }
 
   @Post('/register')
-  // @Auth('auth:create:account')
+  @Auth('auth:create:account')
   @ApiMessage('Cuenta creada con éxito')
   postCreateAccount(@Body() createAccountDto: CreateAccountDto) {
     return this.createAccountUseCase.run(createAccountDto);
