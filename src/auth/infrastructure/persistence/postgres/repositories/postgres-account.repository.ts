@@ -11,7 +11,12 @@ import {
   AccountLoginModel,
   AccountPasswordUpdatingModel,
   AccountTokenValidationModel,
+  AccountWithoutSensitiveDataModel,
 } from '../../../../domain/models';
+
+/** Tipos */
+import { PaginatedResponse } from '../../../../../shared/domain/types';
+import { FindAccountsQuery } from '../../../../domain/types';
 
 /** Puertos */
 import { AccountRepositoryPort } from '../../../../domain/ports';
@@ -42,6 +47,65 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
     }
 
     return this.accountRepository.manager;
+  }
+
+  async find(
+    query: FindAccountsQuery,
+  ): Promise<PaginatedResponse<AccountWithoutSensitiveDataModel>> {
+    try {
+      const { limit = 10, offset = 0 } = query;
+      const qb = this.accountRepository
+        .createQueryBuilder('account')
+        .leftJoinAndSelect('account.profile', 'profile')
+        .leftJoinAndSelect('profile.role', 'role');
+
+      if (query.status)
+        qb.andWhere('profile.isActive = :status', {
+          status: query.status === 'active',
+        });
+
+      if (query.fullname)
+        qb.andWhere('profile.fullname ILIKE :fullname', {
+          fullname: `%${query.fullname}%`,
+        });
+
+      if (query.email)
+        qb.andWhere('account.email ILIKE :email', {
+          email: `%${query.email}%`,
+        });
+
+      if (query.phone)
+        qb.andWhere('profile.phone ILIKE :phone', {
+          phone: `%${query.phone}%`,
+        });
+
+      if (query.roleId)
+        qb.andWhere('profile.roleId = :roleId', { roleId: query.roleId });
+
+      qb.skip(offset).take(limit);
+
+      const [schemas, totalRecords] = await qb.getManyAndCount();
+      const page = Math.floor(offset / limit) + 1;
+      const totalPages = limit > 0 ? Math.ceil(totalRecords / limit) : 0;
+
+      return {
+        records: schemas.map((schema) => ({
+          accountId: schema.id,
+          email: schema.email,
+          fullname: schema.profile.fullname,
+          phone: schema.profile.phone,
+          roleId: schema.profile.roleId,
+          roleName: schema.profile.role.name,
+          isActive: schema.profile.isActive,
+        })),
+        page,
+        totalPages,
+        totalRecords,
+      };
+    } catch (e: unknown) {
+      const error = e as Error;
+      throw new PersistenceException(error.message);
+    }
   }
 
   async findForLoginByEmail(email: string): Promise<AccountLoginModel | null> {

@@ -4,6 +4,7 @@ import { Provider } from '@nestjs/common';
 import {
   ChangePasswordUseCase,
   CreateAccountUseCase,
+  FindAccountsUseCase,
   LoginUseCase,
   LogoutUseCase,
   RefreshSessionUseCase,
@@ -52,6 +53,15 @@ import {
 } from '../../../users/domain/ports';
 
 export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
+  {
+    provide: FindAccountsUseCase,
+
+    useFactory: (accountRepository: AccountRepositoryPort) => {
+      return new FindAccountsUseCase(accountRepository);
+    },
+
+    inject: [ACCOUNT_REPOSITORY],
+  },
   {
     provide: ChangePasswordUseCase,
 

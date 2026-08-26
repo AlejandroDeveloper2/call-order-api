@@ -10,9 +10,17 @@ import {
   AccountLoginModel,
   AccountPasswordUpdatingModel,
   AccountTokenValidationModel,
+  AccountWithoutSensitiveDataModel,
 } from '../models';
 
+/** Tipos */
+import { FindAccountsQuery } from '../types';
+import { PaginatedResponse } from '../../../shared/domain/types';
+
 export abstract class AccountRepositoryPort {
+  abstract find(
+    query: FindAccountsQuery,
+  ): Promise<PaginatedResponse<AccountWithoutSensitiveDataModel>>;
   abstract findForLoginByEmail(
     email: string,
   ): Promise<AccountLoginModel | null>;

@@ -7,11 +7,10 @@ import { UserRepositoryPort } from '../../../../domain/ports';
 import { TransactionContext } from '../../../../../shared/domain/ports';
 
 /** Entidades de dominio */
-import { User, UserSearchQuery } from '../../../../domain/entities';
+import { User } from '../../../../domain/entities';
 
 /** Tipos de dominio */
 import { UpdateUserInput } from '../../../../domain/types';
-import { PaginatedResponse } from '../../../../../shared/domain/types';
 
 /** Errores de infra */
 import { PersistenceException } from '../../../../../shared/infrastructure/exceptions';
@@ -40,52 +39,6 @@ export class PostgresUserRepository implements UserRepositoryPort {
     return this.repository.manager;
   }
 
-  async find(query: UserSearchQuery): Promise<PaginatedResponse<User>> {
-    try {
-      const { limit = 10, offset = 0 } = query;
-      const qb = this.repository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.role', 'role')
-        .leftJoinAndSelect('user.account', 'account');
-
-      if (query.status)
-        qb.andWhere('user.isActive = :status', {
-          status: query.status === 'active',
-        });
-
-      if (query.fullname)
-        qb.andWhere('user.fullname ILIKE :fullname', {
-          fullname: `%${query.fullname}%`,
-        });
-
-      if (query.email)
-        qb.andWhere('account.email ILIKE :email', {
-          email: `%${query.email}%`,
-        });
-
-      if (query.phone)
-        qb.andWhere('user.phone ILIKE :phone', { phone: `%${query.phone}%` });
-
-      if (query.roleId)
-        qb.andWhere('user.roleId = :roleId', { roleId: query.roleId });
-
-      qb.skip(offset).take(limit);
-
-      const [schemas, totalRecords] = await qb.getManyAndCount();
-      const page = Math.floor(offset / limit) + 1;
-      const totalPages = limit > 0 ? Math.ceil(totalRecords / limit) : 0;
-
-      return {
-        records: schemas.map((schema) => UserMapper.toDomain(schema)),
-        page,
-        totalPages,
-        totalRecords,
-      };
-    } catch (e: unknown) {
-      const error = e as Error;
-      throw new PersistenceException(error.message);
-    }
-  }
   async findById(profileId: string): Promise<User | null> {
     try {
       const schema = await this.repository.findOneBy({

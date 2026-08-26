@@ -10,9 +10,9 @@ import {
   IsIn,
 } from 'class-validator';
 
-import type { UserStatusType } from '../../domain/types';
+import type { UserStatusType } from '../../../users/domain/types';
 
-export class UserQueryDto {
+export class FindAccountsQueryDto {
   @IsOptional()
   @IsPositive()
   @Type(() => Number)
@@ -42,6 +42,6 @@ export class UserQueryDto {
   phone?: string;
 
   @IsOptional()
-  @IsUUID('4')
+  @IsUUID()
   roleId?: string;
 }

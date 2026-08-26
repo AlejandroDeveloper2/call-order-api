@@ -2,7 +2,6 @@ import { Provider } from '@nestjs/common';
 
 import {
   FindUserByIdUseCase,
-  FindUsersUseCase,
   UpdateProfileUseCase,
   UpdateUserAvatarUseCase,
   UpdateUserStatusUseCase,
@@ -20,15 +19,7 @@ export const USER_USE_CASE_PROVIDERS: Provider[] = [
 
     inject: [USER_REPOSITORY],
   },
-  {
-    provide: FindUsersUseCase,
 
-    useFactory: (userRepository: UserRepositoryPort) => {
-      return new FindUsersUseCase(userRepository);
-    },
-
-    inject: [USER_REPOSITORY],
-  },
   {
     provide: UpdateUserAvatarUseCase,
 

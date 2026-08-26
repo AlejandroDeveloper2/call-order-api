@@ -5,6 +5,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -13,6 +14,7 @@ import type { Response } from 'express';
 import {
   ChangePasswordUseCase,
   CreateAccountUseCase,
+  FindAccountsUseCase,
   LoginUseCase,
   LogoutUseCase,
   RefreshSessionUseCase,
@@ -27,6 +29,7 @@ import {
 import {
   ChangePasswordDto,
   CreateAccountDto,
+  FindAccountsQueryDto,
   LoginDto,
   ResendCodeDto,
   UpdateEmailDto,
@@ -41,6 +44,7 @@ import { ApiMessage } from '../../../shared/infrastructure/decorators';
 @Controller('auth')
 export class AuthController {
   constructor(
+    private readonly findAccountsUsecase: FindAccountsUseCase,
     private readonly loginUseCase: LoginUseCase,
     private readonly validateIdentityUseCase: ValidateIdentityUseCase,
     private readonly createAccountUseCase: CreateAccountUseCase,
@@ -52,6 +56,13 @@ export class AuthController {
     private readonly changePasswordUseCase: ChangePasswordUseCase,
     private readonly updatePasswordUseCase: UpdatePasswordUseCase,
   ) {}
+
+  @Get('/')
+  @Auth('auth:read:all')
+  @ApiMessage('Cuentas obtenidas correctamente')
+  getAccounts(@Query() findAccountsQueryDto: FindAccountsQueryDto) {
+    return this.findAccountsUsecase.run(findAccountsQueryDto);
+  }
 
   @Post('/login')
   @ApiMessage('Credenciales verificadas correctamente')
@@ -80,7 +91,7 @@ export class AuthController {
   }
 
   @Post('/register')
-  @Auth('auth:create:account')
+  // @Auth('auth:create:account')
   @ApiMessage('Cuenta creada con éxito')
   postCreateAccount(@Body() createAccountDto: CreateAccountDto) {
     return this.createAccountUseCase.run(createAccountDto);

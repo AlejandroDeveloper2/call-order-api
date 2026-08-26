@@ -1,6 +1,6 @@
-import { UserStatusType } from '../../domain/types';
+import { UserStatusType } from '../../../users/domain/types';
 
-export interface UserQueryCommand {
+export interface FindAccountsQueryCommand {
   limit?: number;
   offset?: number;
   status?: UserStatusType;

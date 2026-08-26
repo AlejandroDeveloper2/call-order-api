@@ -1,3 +1,5 @@
+import { UserStatusType } from '../../../users/domain/types';
+
 type VerificationCodeType = 'double-factor';
 
 interface AccessTokenPayload {
@@ -6,4 +8,14 @@ interface AccessTokenPayload {
   profileId: string;
 }
 
-export { VerificationCodeType, AccessTokenPayload };
+interface FindAccountsQuery {
+  limit?: number;
+  offset?: number;
+  status?: UserStatusType;
+  fullname?: string;
+  email?: string;
+  phone?: string;
+  roleId?: string;
+}
+
+export { VerificationCodeType, AccessTokenPayload, FindAccountsQuery };

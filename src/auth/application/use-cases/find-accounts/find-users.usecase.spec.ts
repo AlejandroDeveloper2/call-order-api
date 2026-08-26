@@ -8,7 +8,7 @@ import { PaginatedResponse } from '../../../../shared/domain/types';
 import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
 
 /** Casos de uso */
-import { FindUsersUseCase } from './find-users.usecase';
+import { FindUsersUseCase } from './find-accounts.usecase';
 
 /** Utilidades */
 import { buildProfile } from '../../../../shared/application/utils/domain-class-contructor';

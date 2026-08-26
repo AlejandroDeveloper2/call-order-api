@@ -5,3 +5,4 @@ export * from './resend-code.command';
 export * from './update-email.command';
 export * from './update-password.command';
 export * from './validate-identity.command';
+export * from './find-accounts-query.command';

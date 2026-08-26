@@ -5,3 +5,4 @@ export * from './session-validation.model';
 export * from './session-to-update.model';
 export * from './account-password-updating.model';
 export * from './account-token-validation.model';
+export * from './account-without-sensitive-data.model';
