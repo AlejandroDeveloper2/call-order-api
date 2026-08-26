@@ -24,7 +24,7 @@ export class UpdatePasswordUseCase {
 
     const newPasswordValue = Password.create(newPassword).toString();
 
-    const passwordHash = await this.encryptor.hash(newPasswordValue, 20);
+    const passwordHash = await this.encryptor.hash(newPasswordValue, 14);
 
     const affectedRows = await this.accountRepository.updatePassword(
       accountId,

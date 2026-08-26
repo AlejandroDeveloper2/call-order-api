@@ -7,6 +7,7 @@ export class VerificationCodeMapper {
     return new VerificationCode(
       schema.id,
       schema.codeHash,
+      schema.codeLookup,
       schema.type,
       schema.expiresAt,
       schema.attempts,
@@ -21,6 +22,7 @@ export class VerificationCodeMapper {
     const schema = new PostgresVerificationCodeSchema();
     schema.id = domain.getVerificationCodeId;
     schema.codeHash = domain.getCodeHash;
+    schema.codeLookup = domain.getCodeLookup;
     schema.type = domain.getType;
     schema.expiresAt = domain.getExpiresAt;
     schema.attempts = domain.getAttempts;

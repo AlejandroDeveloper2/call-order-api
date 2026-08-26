@@ -18,6 +18,7 @@ import { VerificationCodeMapper } from '../mappers';
 /** Adapters */
 import { TypeOrmTransactionContext } from '../../../../../shared/infrastructure/adapters';
 import { VerificationCodeValidationModel } from '../../../../domain/models';
+
 import { PersistenceException } from '../../../../../shared/infrastructure/exceptions';
 
 @Injectable()
@@ -37,12 +38,13 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
 
   async findForIdentityValidation(
     email: string,
-  ): Promise<VerificationCodeValidationModel[]> {
+    codeLookup: string,
+  ): Promise<VerificationCodeValidationModel | null> {
     try {
-      const results = await this.repository
+      const result = await this.repository
         .createQueryBuilder('code')
-        .innerJoin('code.account', 'account')
-        .innerJoin('account.profile', 'profile')
+        .innerJoinAndSelect('code.account', 'account')
+        .innerJoinAndSelect('account.profile', 'profile')
         .select([
           'code.id',
           'code.codeHash',
@@ -52,23 +54,28 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
           'account.email',
           'profile.id',
           'profile.roleId',
-          'code.usedAt',
         ])
         .where('account.email = :email', { email })
+        .andWhere('code.codeLookup = :codeLookup', {
+          codeLookup,
+        })
         .andWhere('code.usedAt IS NULL')
-        .getMany();
+        .orderBy('code.createdAt', 'DESC')
+        .getOne();
 
-      return results.map((r) => ({
-        verificationCodeId: r.id,
-        codeHash: r.codeHash,
-        expiresAt: r.expiresAt,
-        attempts: r.attempts,
-        accountId: r.accountId,
+      if (!result) return null;
+
+      return {
+        verificationCodeId: result.id,
+        codeHash: result.codeHash,
+        expiresAt: result.expiresAt,
+        attempts: result.attempts,
+        accountId: result.accountId,
         profile: {
-          profileId: r.account.profile.id,
-          roleId: r.account.profile.roleId,
+          profileId: result.account.profile.id,
+          roleId: result.account.profile.roleId,
         },
-      }));
+      };
     } catch (error: unknown) {
       const e = error as Error;
       throw new PersistenceException(e.message);
@@ -77,13 +84,14 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
 
   async findExpiredForForwarding(
     email: string,
-  ): Promise<VerificationCodeValidationModel[]> {
+    codeLookup: string,
+  ): Promise<VerificationCodeValidationModel | null> {
     const now = new Date();
     try {
-      const results = await this.repository
+      const result = await this.repository
         .createQueryBuilder('code')
-        .innerJoin('code.account', 'account')
-        .innerJoin('account.profile', 'profile')
+        .innerJoinAndSelect('code.account', 'account')
+        .innerJoinAndSelect('account.profile', 'profile')
         .select([
           'code.id',
           'code.codeHash',
@@ -93,24 +101,29 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
           'account.email',
           'profile.id',
           'profile.roleId',
-          'code.usedAt',
         ])
         .where('account.email = :email', { email })
+        .andWhere('code.codeLookup = :codeLookup', {
+          codeLookup,
+        })
         .andWhere('code.usedAt IS NULL')
         .andWhere('code.expiresAt < :now', { now })
-        .getMany();
+        .orderBy('code.createdAt', 'DESC')
+        .getOne();
 
-      return results.map((r) => ({
-        verificationCodeId: r.id,
-        codeHash: r.codeHash,
-        expiresAt: r.expiresAt,
-        attempts: r.attempts,
-        accountId: r.accountId,
+      if (!result) return null;
+
+      return {
+        verificationCodeId: result.id,
+        codeHash: result.codeHash,
+        expiresAt: result.expiresAt,
+        attempts: result.attempts,
+        accountId: result.accountId,
         profile: {
-          profileId: r.account.profile.id,
-          roleId: r.account.profile.roleId,
+          profileId: result.account.profile.id,
+          roleId: result.account.profile.roleId,
         },
-      }));
+      };
     } catch (error: unknown) {
       const e = error as Error;
       throw new PersistenceException(e.message);
@@ -148,7 +161,12 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
 
   async refresh(
     verificationCodeId: string,
-    payload: { attempts: number; codeHash: string; expiresAt: Date },
+    payload: {
+      attempts: number;
+      codeHash: string;
+      codeLookup: string;
+      expiresAt: Date;
+    },
   ): Promise<number> {
     try {
       const result = await this.repository.update(

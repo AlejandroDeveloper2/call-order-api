@@ -48,7 +48,7 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
     try {
       const result = await this.accountRepository
         .createQueryBuilder('account')
-        .innerJoin('account.profile', 'profile')
+        .innerJoinAndSelect('account.profile', 'profile')
         .select([
           'account.id',
           'account.passwordHash',
@@ -93,7 +93,7 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
     try {
       const result = await this.accountRepository
         .createQueryBuilder('account')
-        .innerJoin('account.profile', 'profile')
+        .innerJoinAndSelect('account.profile', 'profile')
         .select([
           'account.id',
           'profile.id',
@@ -125,7 +125,7 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
     try {
       const result = await this.accountRepository
         .createQueryBuilder('account')
-        .innerJoin('account.profile', 'profile')
+        .innerJoinAndSelect('account.profile', 'profile')
         .select([
           'account.id',
           'account.lockedUntil',

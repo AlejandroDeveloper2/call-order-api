@@ -7,11 +7,13 @@ import { VerificationCodeValidationModel } from '../models';
 export abstract class VerificationCodeRepositoryPort {
   abstract findForIdentityValidation(
     email: string,
-  ): Promise<VerificationCodeValidationModel[]>;
+    codeLookup: string,
+  ): Promise<VerificationCodeValidationModel | null>;
 
   abstract findExpiredForForwarding(
     email: string,
-  ): Promise<VerificationCodeValidationModel[]>;
+    codeLookup: string,
+  ): Promise<VerificationCodeValidationModel | null>;
 
   abstract create(verificationCode: VerificationCode): Promise<void>;
 
@@ -26,6 +28,7 @@ export abstract class VerificationCodeRepositoryPort {
     payload: {
       attempts: number;
       codeHash: string;
+      codeLookup: string;
       expiresAt: Date;
     },
   ): Promise<number>;

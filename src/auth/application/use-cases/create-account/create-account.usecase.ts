@@ -46,7 +46,7 @@ export class CreateAccountUseCase {
     const userId = this.idGenerator.generate();
 
     /** Generar hash de contraseña */
-    const passwordHash = await this.encryptor.hash(password, 10);
+    const passwordHash = await this.encryptor.hash(password, 14);
 
     /** Crear las instancias de dominio de la cuenta y el usuario */
     const user = User.create(

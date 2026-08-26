@@ -29,7 +29,9 @@ import {
   RefreshTokenGeneratorPort,
   SESSION_REPOSITORY,
   SessionRepositoryPort,
+  VERIFICATION_CODE_LOOK_UP,
   VERIFICATION_CODE_REPOSITORY,
+  VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../domain/ports';
 
@@ -99,6 +101,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       emailSender: EmailSenderPort,
       encryptor: EncryptorPort,
       idGenerator: IdGeneratorPort,
+      verificationCodeLookup: VerificationCodeLookupPort,
     ) => {
       return new LoginUseCase(
         accountRepository,
@@ -106,6 +109,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
         emailSender,
         encryptor,
         idGenerator,
+        verificationCodeLookup,
       );
     },
 
@@ -115,6 +119,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       EMAIL_SENDER_KEY,
       ENCRYPTOR,
       ID_GENERATOR_KEY,
+      VERIFICATION_CODE_LOOK_UP,
     ],
   },
   {
@@ -164,15 +169,22 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       verificationCodeRepository: VerificationCodeRepositoryPort,
       emailSender: EmailSenderPort,
       encryptor: EncryptorPort,
+      verificationCodeLookup: VerificationCodeLookupPort,
     ) => {
       return new ResendCodeUseCase(
         verificationCodeRepository,
         emailSender,
         encryptor,
+        verificationCodeLookup,
       );
     },
 
-    inject: [VERIFICATION_CODE_REPOSITORY, EMAIL_SENDER_KEY, ENCRYPTOR],
+    inject: [
+      VERIFICATION_CODE_REPOSITORY,
+      EMAIL_SENDER_KEY,
+      ENCRYPTOR,
+      VERIFICATION_CODE_LOOK_UP,
+    ],
   },
 
   {
@@ -210,6 +222,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       encryptor: EncryptorPort,
       accessTokenGenerator: AccessTokenGeneratorPort,
       refreshTokenGenerator: RefreshTokenGeneratorPort,
+      verificationCodeLookup: VerificationCodeLookupPort,
     ) => {
       return new ValidateIdentityUseCase(
         accountRepository,
@@ -220,6 +233,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
         encryptor,
         accessTokenGenerator,
         refreshTokenGenerator,
+        verificationCodeLookup,
       );
     },
 
@@ -232,6 +246,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       ENCRYPTOR,
       ACCESS_TOKEN_GENERATOR,
       REFRESH_TOKEN_GENERATOR,
+      VERIFICATION_CODE_LOOK_UP,
     ],
   },
 

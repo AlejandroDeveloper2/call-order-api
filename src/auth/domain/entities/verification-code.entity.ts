@@ -4,6 +4,7 @@ export class VerificationCode {
   constructor(
     private readonly verificationCodeId: string,
     private codeHash: string,
+    private codeLookup: string,
     private type: VerificationCodeType,
     private expiresAt: Date,
     private attempts: number,
@@ -14,6 +15,7 @@ export class VerificationCode {
   static create(
     verificationCodeId: string,
     codeHash: string,
+    codeLookup: string,
     type: VerificationCodeType,
     expiresAt: Date,
     attempts: number,
@@ -23,6 +25,7 @@ export class VerificationCode {
     return new VerificationCode(
       verificationCodeId,
       codeHash,
+      codeLookup,
       type,
       expiresAt,
       attempts,
@@ -45,6 +48,10 @@ export class VerificationCode {
 
   get getCodeHash(): string {
     return this.codeHash;
+  }
+
+  get getCodeLookup(): string {
+    return this.codeLookup;
   }
 
   get getType(): VerificationCodeType {

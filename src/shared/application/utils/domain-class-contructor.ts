@@ -64,6 +64,7 @@ export const buildVerificationCode = (
   const verificationCode = VerificationCode.create(
     'test-verification-code-id',
     'test-code-hash',
+    'test-code-lookup',
     'double-factor',
     addMinutes(new Date(), 10),
     0,

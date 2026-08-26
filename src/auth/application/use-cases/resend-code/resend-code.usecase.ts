@@ -6,6 +6,7 @@ import { VerificationCode } from '../../../domain/entities';
 /** Puertos */
 import {
   EncryptorPort,
+  VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
 import { EmailSenderPort } from '../../../../shared/domain/ports';
@@ -19,9 +20,6 @@ import {
 /** Value Objects */
 import { Code, Email } from '../../../domain/value-objects';
 
-/** Modelos de lectura */
-import { VerificationCodeValidationModel } from '../../../domain/models';
-
 /** Commands */
 import { ResendCodeCommand } from '../../commands';
 
@@ -30,6 +28,7 @@ export class ResendCodeUseCase {
     private readonly verificationCodeRepository: VerificationCodeRepositoryPort,
     private readonly emailSender: EmailSenderPort,
     private readonly encryptor: EncryptorPort,
+    private readonly verificationCodeLookup: VerificationCodeLookupPort,
   ) {}
   /** Logica para enviar código de verificación de nuevo si el anterior expiró */
   async run(resendCodeCommand: ResendCodeCommand): Promise<void> {
@@ -39,39 +38,41 @@ export class ResendCodeUseCase {
     const emailValue = Email.create(email).toString();
     const expiredCodeValue = Code.create(expiredCode).toString();
 
+    const codeLookup =
+      this.verificationCodeLookup.generateLookup(expiredCodeValue);
+
     /** Obtener la cuenta asociada al accountId proporcionado */
-    const verificationCodes =
+    const verificationCode =
       await this.verificationCodeRepository.findExpiredForForwarding(
         emailValue,
+        codeLookup,
+      );
+
+    if (!verificationCode)
+      throw new InvalidCodeException(
+        'Código de verificación de autenticación invalido',
       );
 
     /** Comparar el hash del código para filtrar el código de verificación actual */
-    let validCode: VerificationCodeValidationModel | null = null;
-    for (const verificationCode of verificationCodes) {
-      const isValid = await this.encryptor.compare(
-        expiredCodeValue,
-        verificationCode.codeHash,
-      );
-      if (isValid) {
-        validCode = verificationCode;
-        break;
-      }
-    }
+    const isValid = await this.encryptor.compare(
+      expiredCodeValue,
+      verificationCode.codeHash,
+    );
 
     /** Validar si el código ingresado es valido*/
-    if (!validCode)
+    if (!isValid)
       throw new InvalidCodeException(
         'Código de verificación de autenticación invalido',
       );
 
     /** Validar si el código ingresado esta expirado */
-    if (isBefore(new Date(), new Date(validCode.expiresAt)))
+    if (isBefore(new Date(), new Date(verificationCode.expiresAt)))
       throw new CodeNotExpiredYetException('El código aun no ha expirado');
 
     /** Generar nuevo código y reenviarlo al correo del usuario */
     await this.generateAndResendCode({
-      oldVerficationCodeId: validCode.verificationCodeId,
-      attempts: validCode.attempts,
+      oldVerficationCodeId: verificationCode.verificationCodeId,
+      attempts: verificationCode.attempts,
       email,
     });
   }
@@ -89,6 +90,9 @@ export class ResendCodeUseCase {
     /** Validar con el value object */
     const codeValue = Code.create(code).toString();
 
+    /** Generar el codeLookup */
+    const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
+
     /** Generar el hash para el nuevo código */
     const codeHash = await this.encryptor.hash(codeValue, 20);
 
@@ -96,6 +100,7 @@ export class ResendCodeUseCase {
     await this.verificationCodeRepository.refresh(oldVerficationCodeId, {
       attempts: attempts + 1,
       codeHash,
+      codeLookup,
       expiresAt: addMinutes(new Date(), 10),
     });
     /** Enviar correo con nuevo código */

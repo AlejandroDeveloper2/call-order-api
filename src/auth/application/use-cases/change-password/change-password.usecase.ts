@@ -50,7 +50,7 @@ export class ChangePasswordUseCase {
       throw new IncorrectPasswordException('Contraseña actual incorrecta');
 
     /** Encriptamos la nueva contraseña  y la actualizamos */
-    const newPasswordHash = await this.encryptor.hash(newPassword, 20);
+    const newPasswordHash = await this.encryptor.hash(newPassword, 14);
 
     /** Actualizamos la contraseña */
     await this.accountRepository.updatePassword(accountId, newPasswordHash);

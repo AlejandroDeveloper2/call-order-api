@@ -10,6 +10,7 @@ import {
   EncryptorPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
+  VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
 
@@ -45,6 +46,7 @@ export class ValidateIdentityUseCase {
     private readonly encryptor: EncryptorPort,
     private readonly accessTokenGenerator: AccessTokenGeneratorPort,
     private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
+    private readonly verificationCodeLookup: VerificationCodeLookupPort,
   ) {}
 
   private async validateVerificationCode(
@@ -55,29 +57,28 @@ export class ValidateIdentityUseCase {
     const emailValue = Email.create(email).toString();
     const codeValue = Code.create(code).toString();
 
-    /** Obtener los códigos de verificación activos  */
-    const verificationCodes =
+    const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
+
+    /** Obtener el último código de verificación activo  */
+    const verificationCode =
       await this.verificationCodeRepository.findForIdentityValidation(
         emailValue,
+        codeLookup,
       );
 
-    /** Comparar el hash del código para filtrar el código de verificación actual */
-    let validCode: VerificationCodeValidationModel | null = null;
-    for (const verificationCode of verificationCodes) {
-      const isValid = await this.encryptor.compare(
-        codeValue,
-        verificationCode.codeHash,
-      );
-      if (isValid) {
-        validCode = verificationCode;
-        break;
-      }
-    }
-
-    if (!validCode)
+    if (!verificationCode)
       throw new InvalidCodeException('Código de verificación invalido');
 
-    return validCode;
+    /** Comparar el hash del código para filtrar el código de verificación actual */
+    const isValid = await this.encryptor.compare(
+      codeValue,
+      verificationCode.codeHash,
+    );
+
+    if (!isValid)
+      throw new InvalidCodeException('Código de verificación invalido');
+
+    return verificationCode;
   }
 
   async run(
@@ -121,8 +122,8 @@ export class ValidateIdentityUseCase {
     const refreshTokenValue = RefreshToken.create(refreshToken).toString();
 
     /** Encriptar ambos token para agregar una capa solida de seguridad */
-    const tokenHash = await this.encryptor.hash(tokenValue, 20);
-    const refreshTokenHash = await this.encryptor.hash(refreshTokenValue, 20);
+    const tokenHash = await this.encryptor.hash(tokenValue, 12);
+    const refreshTokenHash = await this.encryptor.hash(refreshTokenValue, 12);
 
     /** Invalidar las sesiones activas anteriores de la misma cuenta en una sola consulta */
     await this.sessionRepository.revokeByAccountId(

@@ -5,3 +5,4 @@ export * from './encryptor.port';
 export * from './access-token-generator.port';
 export * from './access-token-verifier.port';
 export * from './refresh-token-generator.port';
+export * from './verification-code-look-up.port';

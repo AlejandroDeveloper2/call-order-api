@@ -30,7 +30,7 @@ export class ValidateSessionUseCase {
       throw new InvalidSessionException('Token de sesión inválido');
     }
 
-    /** Obtener las sesiones asociadas al ID de cuenta proporcionado  */
+    /** Obtener la sesione asociada al ID de cuenta proporcionado  */
     const session =
       await this.sessionRepository.findActiveForValidation(accountId);
 

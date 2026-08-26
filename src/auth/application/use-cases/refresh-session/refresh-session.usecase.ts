@@ -74,10 +74,10 @@ export class RefreshSessionUseCase {
       RefreshToken.create(newRefreshToken).toString();
 
     /** Encriptar el nuevo token y refresh token */
-    const newTokenHash: string = await this.encryptor.hash(newTokenValue, 20);
+    const newTokenHash: string = await this.encryptor.hash(newTokenValue, 12);
     const newRefreshTokenHash: string = await this.encryptor.hash(
       newRefreshTokenValue,
-      20,
+      12,
     );
 
     /** Actualizar la sesión con el nuevo token, refresh token , última actividad y tiempo de expiración */

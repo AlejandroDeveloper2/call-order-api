@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -30,6 +31,10 @@ export class PostgresVerificationCodeSchema {
 
   @Column()
   codeHash!: string;
+
+  @Index(['accountId', 'codeLookup'])
+  @Column({ length: 64 })
+  codeLookup!: string;
 
   @Column({ enum: ['double-factor'], default: 'double-factor' })
   type!: VerificationCodeType;

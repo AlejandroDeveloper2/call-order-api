@@ -4,6 +4,7 @@ import { addHours, addMinutes } from 'date-fns';
 import {
   AccountRepositoryPort,
   EncryptorPort,
+  VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
 import {
@@ -37,6 +38,7 @@ export class LoginUseCase {
     private readonly emailSender: EmailSenderPort,
     private readonly encryptor: EncryptorPort,
     private readonly idGenerator: IdGeneratorPort,
+    private readonly verificationCodeLookup: VerificationCodeLookupPort,
   ) {}
 
   async run(loginCommand: LoginCommand): Promise<void> {
@@ -120,11 +122,14 @@ export class LoginUseCase {
 
     const codeValue = Code.create(VerificationCode.generate()).toString();
 
-    const codeHash = await this.encryptor.hash(codeValue, 20);
+    const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
+
+    const codeHash = await this.encryptor.hash(codeValue, 10);
 
     const verificationCode = VerificationCode.create(
       codeId,
       codeHash,
+      codeLookup,
       'double-factor',
       addMinutes(new Date(), 10),
       0,
