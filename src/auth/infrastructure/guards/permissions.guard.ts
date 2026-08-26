@@ -25,11 +25,11 @@ export class PermissionsGuard implements CanActivate {
     if (!requiredPermissions || requiredPermissions.length === 0) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
-    const account = request.account;
+    const user = request.user;
 
-    if (!account) throw new NotAuthenticatedException('Usuario no autenticado');
+    if (!user) throw new NotAuthenticatedException('Usuario no autenticado');
 
-    const userPermissions: string[] = account.permissions || [];
+    const userPermissions: string[] = user.permissions || [];
 
     const hasAll = requiredPermissions.every((permission) =>
       userPermissions.includes(permission),

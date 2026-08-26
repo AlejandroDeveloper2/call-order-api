@@ -8,10 +8,10 @@ import { NotAuthenticatedException } from '../exceptions';
 export const GetAccount = createParamDecorator(
   (data: keyof AccessTokenPayload, ctx: ExecutionContext) => {
     const req = ctx.switchToHttp().getRequest<Request>();
-    const account = req.account;
+    const user = req.user;
 
-    if (!account) throw new NotAuthenticatedException('Usuario no autenticado');
-    if (!data) return account;
-    return account[data];
+    if (!user) throw new NotAuthenticatedException('Usuario no autenticado');
+    if (!data) return user;
+    return user[data];
   },
 );
