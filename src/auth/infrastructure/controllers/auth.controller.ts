@@ -93,6 +93,7 @@ export class AuthController {
   }
 
   @Post('/logout')
+  @Auth()
   @ApiMessage('Sesión cerrada con éxito')
   async postLogout(
     @Res({ passthrough: true }) res: Response,
@@ -112,6 +113,7 @@ export class AuthController {
   }
 
   @Post('/refresh')
+  @Auth()
   @ApiMessage('Sesión actualizada con éxito')
   async postRefreshSession(
     @Res({ passthrough: true }) res: Response,
@@ -137,6 +139,7 @@ export class AuthController {
   }
 
   @Get('/validate/session')
+  @Auth()
   @ApiMessage('Sesión verificada con éxito')
   getValidateSession(
     @BearerToken() token: string,
