@@ -1,10 +1,9 @@
-import { addMinutes, isBefore } from 'date-fns';
-
 /** Entidades */
 import { VerificationCode } from '../../../domain/entities';
 
 /** Puertos */
 import {
+  DateHandlerPort,
   EncryptorPort,
   VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
@@ -29,6 +28,7 @@ export class ResendCodeUseCase {
     private readonly emailSender: EmailSenderPort,
     private readonly encryptor: EncryptorPort,
     private readonly verificationCodeLookup: VerificationCodeLookupPort,
+    private readonly dateHandler: DateHandlerPort,
   ) {}
   /** Logica para enviar código de verificación de nuevo si el anterior expiró */
   async run(resendCodeCommand: ResendCodeCommand): Promise<void> {
@@ -66,7 +66,12 @@ export class ResendCodeUseCase {
       );
 
     /** Validar si el código ingresado esta expirado */
-    if (isBefore(new Date(), new Date(verificationCode.expiresAt)))
+    if (
+      this.dateHandler.isBefore(
+        new Date(),
+        new Date(verificationCode.expiresAt),
+      )
+    )
       throw new CodeNotExpiredYetException('El código aun no ha expirado');
 
     /** Generar nuevo código y reenviarlo al correo del usuario */
@@ -94,14 +99,14 @@ export class ResendCodeUseCase {
     const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
 
     /** Generar el hash para el nuevo código */
-    const codeHash = await this.encryptor.hash(codeValue, 20);
+    const codeHash = await this.encryptor.hash(codeValue, 10);
 
     /** Actualizar a nivel de base de datos el valor del nuevo código */
     await this.verificationCodeRepository.refresh(oldVerficationCodeId, {
       attempts: attempts + 1,
       codeHash,
       codeLookup,
-      expiresAt: addMinutes(new Date(), 10),
+      expiresAt: this.dateHandler.addMinutes(new Date(), 10),
     });
     /** Enviar correo con nuevo código */
     await this.emailSender.sendEmail(

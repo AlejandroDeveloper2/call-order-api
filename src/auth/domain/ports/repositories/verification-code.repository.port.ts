@@ -1,8 +1,8 @@
-import { TransactionContext } from '../../../shared/domain/ports';
+import { TransactionContext } from '../../../../shared/domain/ports';
 
-import { VerificationCode } from '../entities';
+import { VerificationCode } from '../../entities';
 
-import { VerificationCodeValidationModel } from '../models';
+import { VerificationCodeValidationModel } from '../../models';
 
 export abstract class VerificationCodeRepositoryPort {
   abstract findForIdentityValidation(

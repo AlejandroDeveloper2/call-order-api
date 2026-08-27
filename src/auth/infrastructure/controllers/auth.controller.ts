@@ -57,7 +57,7 @@ export class AuthController {
     private readonly updatePasswordUseCase: UpdatePasswordUseCase,
   ) {}
 
-  @Get('/')
+  @Get('/accounts')
   @Auth('auth:read:all')
   @ApiMessage('Cuentas obtenidas correctamente')
   getAccounts(@Query() findAccountsQueryDto: FindAccountsQueryDto) {

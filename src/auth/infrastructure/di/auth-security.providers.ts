@@ -1,4 +1,5 @@
 import { Provider } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import {
   ENCRYPTOR,
@@ -16,8 +17,7 @@ import {
   CryptoRefreshTokenGeneratorAdapter,
   HmacVerificationCodeLookupAdapter,
   NodeTokenHasherAdapter,
-} from '../security';
-import { ConfigService } from '@nestjs/config';
+} from '../adapters';
 
 export const AUTH_SECURITY_PROVIDERS: Provider[] = [
   {

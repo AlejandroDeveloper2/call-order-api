@@ -1,9 +1,8 @@
-import { addDays } from 'date-fns';
-
 /** Puertos */
 import {
   AccessTokenGeneratorPort,
   AccessTokenVerifierPort,
+  DateHandlerPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
   TokenHasherPort,
@@ -22,6 +21,7 @@ export class RefreshSessionUseCase {
     private readonly accessTokenGenerator: AccessTokenGeneratorPort,
     private readonly accessTokenVerifier: AccessTokenVerifierPort,
     private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
+    private readonly dateHandler: DateHandlerPort,
   ) {}
 
   async run(
@@ -83,7 +83,7 @@ export class RefreshSessionUseCase {
       tokenHash: newTokenHash,
       refreshTokenHash: newRefreshTokenHash,
       lastActivityAt: new Date(),
-      expiresAt: addDays(new Date(), 1),
+      expiresAt: this.dateHandler.addDays(new Date(), 1),
     });
 
     return {

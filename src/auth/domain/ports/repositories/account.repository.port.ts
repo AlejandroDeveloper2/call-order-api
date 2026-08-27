@@ -1,8 +1,8 @@
 /** Puertos */
-import { TransactionContext } from '../../../shared/domain/ports';
+import { TransactionContext } from '../../../../shared/domain/ports';
 
 /** Entidades */
-import { Account } from '../entities';
+import { Account } from '../../entities';
 
 /** Modelos de lectura*/
 import {
@@ -11,11 +11,11 @@ import {
   AccountPasswordUpdatingModel,
   AccountTokenValidationModel,
   AccountWithoutSensitiveDataModel,
-} from '../models';
+} from '../../models';
 
 /** Tipos */
-import { FindAccountsQuery } from '../types';
-import { PaginatedResponse } from '../../../shared/domain/types';
+import { FindAccountsQuery } from '../../types';
+import { PaginatedResponse } from '../../../../shared/domain/types';
 
 export abstract class AccountRepositoryPort {
   abstract find(

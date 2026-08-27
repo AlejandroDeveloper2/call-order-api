@@ -24,6 +24,8 @@ import {
   AccessTokenVerifierPort,
   ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
+  DATE_HANDLER,
+  DateHandlerPort,
   ENCRYPTOR,
   EncryptorPort,
   REFRESH_TOKEN_GENERATOR,
@@ -114,6 +116,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       encryptor: EncryptorPort,
       idGenerator: IdGeneratorPort,
       verificationCodeLookup: VerificationCodeLookupPort,
+      dateHandler: DateHandlerPort,
     ) => {
       return new LoginUseCase(
         accountRepository,
@@ -122,6 +125,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
         encryptor,
         idGenerator,
         verificationCodeLookup,
+        dateHandler,
       );
     },
 
@@ -132,6 +136,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       ENCRYPTOR,
       ID_GENERATOR_KEY,
       VERIFICATION_CODE_LOOK_UP,
+      DATE_HANDLER,
     ],
   },
   {
@@ -155,6 +160,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       accessTokenGenerator: AccessTokenGeneratorPort,
       accessTokenVerifier: AccessTokenVerifierPort,
       refreshTokenGenerator: RefreshTokenGeneratorPort,
+      dateHandler: DateHandlerPort,
     ) => {
       return new RefreshSessionUseCase(
         sessionRepository,
@@ -162,6 +168,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
         accessTokenGenerator,
         accessTokenVerifier,
         refreshTokenGenerator,
+        dateHandler,
       );
     },
 
@@ -171,6 +178,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       ACCESS_TOKEN_GENERATOR,
       ACCESS_TOKEN_VERIFIER,
       REFRESH_TOKEN_GENERATOR,
+      DATE_HANDLER,
     ],
   },
 
@@ -182,12 +190,14 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       emailSender: EmailSenderPort,
       encryptor: EncryptorPort,
       verificationCodeLookup: VerificationCodeLookupPort,
+      dateHandler: DateHandlerPort,
     ) => {
       return new ResendCodeUseCase(
         verificationCodeRepository,
         emailSender,
         encryptor,
         verificationCodeLookup,
+        dateHandler,
       );
     },
 
@@ -196,6 +206,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       EMAIL_SENDER_KEY,
       ENCRYPTOR,
       VERIFICATION_CODE_LOOK_UP,
+      DATE_HANDLER,
     ],
   },
 
@@ -235,6 +246,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       accessTokenGenerator: AccessTokenGeneratorPort,
       refreshTokenGenerator: RefreshTokenGeneratorPort,
       verificationCodeLookup: VerificationCodeLookupPort,
+      dateHandler: DateHandlerPort,
     ) => {
       return new ValidateIdentityUseCase(
         accountRepository,
@@ -246,6 +258,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
         accessTokenGenerator,
         refreshTokenGenerator,
         verificationCodeLookup,
+        dateHandler,
       );
     },
 
@@ -259,6 +272,7 @@ export const AUTH_USE_CASE_PROVIDERS: Provider[] = [
       ACCESS_TOKEN_GENERATOR,
       REFRESH_TOKEN_GENERATOR,
       VERIFICATION_CODE_LOOK_UP,
+      DATE_HANDLER,
     ],
   },
 

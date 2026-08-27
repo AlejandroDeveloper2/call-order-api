@@ -1,8 +1,8 @@
-import { TransactionContext } from '../../../shared/domain/ports';
+import { TransactionContext } from '../../../../shared/domain/ports';
 
-import { Session } from '../entities';
+import { Session } from '../../entities';
 
-import { SessionToUpdateModel, SessionValidationModel } from '../models';
+import { SessionToUpdateModel, SessionValidationModel } from '../../models';
 
 export abstract class SessionRepositoryPort {
   abstract findActiveForValidation(

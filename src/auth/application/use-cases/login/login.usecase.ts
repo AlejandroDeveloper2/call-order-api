@@ -1,8 +1,7 @@
-import { addHours, addMinutes } from 'date-fns';
-
 /** Puertos */
 import {
   AccountRepositoryPort,
+  DateHandlerPort,
   EncryptorPort,
   VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
@@ -39,6 +38,7 @@ export class LoginUseCase {
     private readonly encryptor: EncryptorPort,
     private readonly idGenerator: IdGeneratorPort,
     private readonly verificationCodeLookup: VerificationCodeLookupPort,
+    private readonly dateHandler: DateHandlerPort,
   ) {}
 
   async run(loginCommand: LoginCommand): Promise<void> {
@@ -104,7 +104,9 @@ export class LoginUseCase {
   }): Promise<void> {
     const failedAttempts = account.failedAttempts + 1;
     const lockedUtil =
-      failedAttempts >= 5 ? addHours(new Date(), 2) : undefined;
+      failedAttempts >= 5
+        ? this.dateHandler.addHours(new Date(), 2)
+        : undefined;
 
     if (lockedUtil) {
       await this.accountRepository.block(
@@ -131,7 +133,7 @@ export class LoginUseCase {
       codeHash,
       codeLookup,
       'double-factor',
-      addMinutes(new Date(), 10),
+      this.dateHandler.addMinutes(new Date(), 10),
       0,
       account.accountId,
     );

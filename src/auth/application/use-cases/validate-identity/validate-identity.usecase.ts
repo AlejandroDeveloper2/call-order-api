@@ -1,5 +1,3 @@
-import { isAfter, addDays } from 'date-fns';
-
 /** Entidades de dominio */
 import { Session } from '../../../domain/entities';
 
@@ -7,6 +5,7 @@ import { Session } from '../../../domain/entities';
 import {
   AccessTokenGeneratorPort,
   AccountRepositoryPort,
+  DateHandlerPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
   TokenHasherPort,
@@ -47,6 +46,7 @@ export class ValidateIdentityUseCase {
     private readonly accessTokenGenerator: AccessTokenGeneratorPort,
     private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
     private readonly verificationCodeLookup: VerificationCodeLookupPort,
+    private readonly dateHandler: DateHandlerPort,
   ) {}
 
   private async validateVerificationCode(
@@ -103,7 +103,7 @@ export class ValidateIdentityUseCase {
 
     /** Validar si el código ha expirado */
     const today = new Date();
-    if (isAfter(today, new Date(validCode.expiresAt)))
+    if (this.dateHandler.isAfter(today, new Date(validCode.expiresAt)))
       throw new ExpiredCodeException(
         'Código de verificación de autenticación ha expirado',
       );
@@ -132,7 +132,7 @@ export class ValidateIdentityUseCase {
     );
 
     /** Crear la nueva sesión a nivel de base de datos con metadatos opcionales */
-    const expiresAt = addDays(new Date(), 1);
+    const expiresAt = this.dateHandler.addDays(new Date(), 1);
     const lastActivityAt = new Date();
 
     const sessionId = this.idGenerator.generate();
