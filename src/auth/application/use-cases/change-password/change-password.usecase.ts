@@ -29,10 +29,8 @@ export class ChangePasswordUseCase {
     /** Creamos los value objects para validación de las reglas de dominio */
     const currentPassword = Password.create(
       changePasswordCommand.currentPassword,
-    ).toString();
-    const newPassword = Password.create(
-      changePasswordCommand.newPassword,
-    ).toString();
+    );
+    const newPassword = Password.create(changePasswordCommand.newPassword);
 
     /** Obtenemos la cuenta por ID */
     const account =
@@ -42,7 +40,7 @@ export class ChangePasswordUseCase {
 
     /** Validar si la contraseña actual coincide con la almacenada en db */
     const isCorrectPassword = await this.encryptor.compare(
-      currentPassword,
+      currentPassword.toString(),
       account.passwordHash,
     );
 
@@ -50,7 +48,10 @@ export class ChangePasswordUseCase {
       throw new IncorrectPasswordException('Contraseña actual incorrecta');
 
     /** Encriptamos la nueva contraseña  y la actualizamos */
-    const newPasswordHash = await this.encryptor.hash(newPassword, 14);
+    const newPasswordHash = await this.encryptor.hash(
+      newPassword.toString(),
+      14,
+    );
 
     /** Actualizamos la contraseña */
     await this.accountRepository.updatePassword(accountId, newPasswordHash);

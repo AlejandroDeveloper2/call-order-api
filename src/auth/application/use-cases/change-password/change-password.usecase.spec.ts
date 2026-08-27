@@ -1,152 +1,182 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
-
 /** Puertos */
-import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-} from '../../../domain/ports';
+import { AccountRepositoryPort, EncryptorPort } from '../../../domain/ports';
 
-/** Códigos de error */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+/** Modelos de lectura */
+import { AccountPasswordUpdatingModel } from '../../../domain/models';
+
+/** Excepciones de dominio */
+import { InvalidPasswordException } from '../../../domain/exceptions';
 
 /** Caso de uso */
 import { ChangePasswordUseCase } from './change-password.usecase';
 
-/** Dtos */
-import { ChangePasswordDto } from '../../../infrastructure/dto';
+/** Commands */
+import { ChangePasswordCommand } from '../../commands';
 
-/** Utilidades */
-import { buildAccount } from '../../../../shared/application/utils/domain-class-contructor';
+/** Excepciones de aplicación */
+import {
+  AccountNotFoundException,
+  IncorrectPasswordException,
+} from '../../exceptions';
 
-jest.mock('bcrypt');
+type AccountRepositoryMock = Pick<
+  AccountRepositoryPort,
+  'findForUpdatingPassword' | 'updatePassword'
+>;
+type EncryptorMock = Pick<EncryptorPort, 'compare' | 'hash'>;
 
 describe('ChangePasswordUseCase', () => {
   let useCase: ChangePasswordUseCase;
+  let accountRepositoryMock: jest.Mocked<AccountRepositoryMock>;
+  let encryptorMock: jest.Mocked<EncryptorMock>;
 
-  const accountRepository = {
-    update: jest.fn(),
-    findById: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'update' | 'findById'>;
-
-  const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => Promise<boolean>
-  >(bcrypt.compare);
-
-  const bcryptHashMock = jest.mocked<
-    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
-  >(bcrypt.hash);
-
-  const changePasswordDto: ChangePasswordDto = {
-    currentPassword: 'current-password',
-    newPassword: 'new-password',
+  const changePasswordCommand: ChangePasswordCommand = {
+    currentPassword: 'Passwor12345@',
+    newPassword: 'NewPassword12@',
   };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ChangePasswordUseCase,
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: accountRepository,
-        },
-      ],
-    }).compile();
+  beforeEach(() => {
+    accountRepositoryMock = {
+      findForUpdatingPassword: jest.fn(),
+      updatePassword: jest.fn(),
+    };
 
-    useCase = module.get<ChangePasswordUseCase>(ChangePasswordUseCase);
+    encryptorMock = {
+      compare: jest.fn(),
+      hash: jest.fn(),
+    };
+
+    useCase = new ChangePasswordUseCase(
+      accountRepositoryMock as unknown as AccountRepositoryPort,
+      encryptorMock,
+    );
+
     jest.clearAllMocks();
   });
 
   describe('(run)', () => {
-    it('deberia lanzar un AppError si la cuenta no existe', async () => {
+    it('debería lanzar InvalidPasswordException si el nuevo password es inválido', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+
+      const command = {
+        currentPassword: '123456',
+        newPassword: '',
+      };
+
+      // Act
+      const result = useCase.run(accountId, command);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidPasswordException);
+
+      expect(
+        accountRepositoryMock.findForUpdatingPassword,
+      ).not.toHaveBeenCalled();
+
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+
+      expect(accountRepositoryMock.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar una AccountNotFoundException si la cuenta no existe', async () => {
       //Arrange
       const accountId = 'wrong-account-id';
 
-      accountRepository.findById.mockResolvedValue(null);
+      accountRepositoryMock.findForUpdatingPassword.mockResolvedValue(null);
 
       //Act
-      const result = useCase.run(accountId, changePasswordDto);
+      const result = useCase.run(accountId, changePasswordCommand);
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountNotFound,
-        httpCode: 404,
-      });
+      await expect(result).rejects.toThrow(AccountNotFoundException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
+      expect(
+        accountRepositoryMock.findForUpdatingPassword,
+      ).toHaveBeenCalledWith(accountId);
+
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.updatePassword).not.toHaveBeenCalled();
     });
 
-    it('deberia lanzar un AppError si la contraseña actual no es correcta', async () => {
+    it('deberia lanzar un IncorrectPasswordException si la contraseña actual no es correcta', async () => {
       //Arrange
       const accountId = 'test-account-id';
+      const account: AccountPasswordUpdatingModel = {
+        accountId,
+        passwordHash: 'stored-password-hash',
+      };
 
-      const account = buildAccount();
+      accountRepositoryMock.findForUpdatingPassword.mockResolvedValue(account);
 
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareMock.mockResolvedValueOnce(false);
+      encryptorMock.compare.mockResolvedValue(false);
 
       // Act
-      const result = useCase.run(accountId, changePasswordDto);
+      const result = useCase.run(accountId, changePasswordCommand);
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.incorrectPassword,
-        httpCode: 400,
-      });
+      await expect(result).rejects.toThrow(IncorrectPasswordException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      expect(
+        accountRepositoryMock.findForUpdatingPassword,
+      ).toHaveBeenCalledWith(accountId);
 
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        changePasswordDto.currentPassword,
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
+        changePasswordCommand.currentPassword,
         account.passwordHash,
       );
-      expect(bcryptCompareMock).toHaveBeenCalledTimes(1);
 
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).toHaveBeenCalledTimes(1);
+
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.updatePassword).not.toHaveBeenCalled();
     });
 
     it('deberia cambiar la contraseña de la cuenta por la nueva, cuando la cuenta existe y la contraseña previa coincide', async () => {
       //Arrange
       const accountId = 'test-account-id';
+      const account: AccountPasswordUpdatingModel = {
+        accountId,
+        passwordHash: 'stored-password-hash',
+      };
+      const newPasswordHash = 'new-password-hash';
 
-      const account = buildAccount();
+      accountRepositoryMock.findForUpdatingPassword.mockResolvedValue(account);
 
-      accountRepository.findById.mockResolvedValue(account);
+      encryptorMock.compare.mockResolvedValue(true);
 
-      bcryptCompareMock.mockResolvedValueOnce(true);
+      encryptorMock.hash.mockResolvedValue(newPasswordHash);
 
-      bcryptHashMock.mockResolvedValueOnce('new-password-hash');
-
-      accountRepository.update.mockResolvedValue(undefined);
+      accountRepositoryMock.updatePassword.mockResolvedValue(1);
 
       //Act
-      const result = await useCase.run(accountId, changePasswordDto);
+      const result = await useCase.run(accountId, changePasswordCommand);
 
       //Assert
       expect(result).toBeUndefined();
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      expect(
+        accountRepositoryMock.findForUpdatingPassword,
+      ).toHaveBeenCalledWith(accountId);
 
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        changePasswordDto.currentPassword,
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
+        changePasswordCommand.currentPassword,
         account.passwordHash,
       );
-      expect(bcryptCompareMock).toHaveBeenCalledTimes(1);
+      expect(encryptorMock.compare).toHaveBeenCalledTimes(1);
 
-      expect(bcryptHashMock).toHaveBeenCalledWith(
-        changePasswordDto.newPassword,
-        10,
+      expect(encryptorMock.hash).toHaveBeenCalledWith(
+        changePasswordCommand.newPassword,
+        14,
       );
-      expect(bcryptHashMock).toHaveBeenCalledTimes(1);
+      expect(encryptorMock.hash).toHaveBeenCalledTimes(1);
 
-      expect(accountRepository.update).toHaveBeenCalledWith(accountId, {
-        passwordHash: 'new-password-hash',
-      });
+      expect(accountRepositoryMock.updatePassword).toHaveBeenCalledWith(
+        accountId,
+        newPasswordHash,
+      );
     });
   });
 });
