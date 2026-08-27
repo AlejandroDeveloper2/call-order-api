@@ -1,245 +1,322 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
-
 /** Entidades */
 import { Account } from '../../../domain/entities';
 import { User } from '../../../../users/domain/entities';
 
 /** Puertos */
+import { AccountRepositoryPort, EncryptorPort } from '../../../domain/ports';
+import { UserRepositoryPort } from '../../../../users/domain/ports';
 import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-} from '../../../domain/ports';
-
-import {
-  USER_REPOSITORY,
-  UserRepositoryPort,
-} from '../../../../users/domain/ports';
-
-import {
-  TRANSACTION_MANAGER,
+  IdGeneratorPort,
   TransactionContext,
   TransactionManagerPort,
 } from '../../../../shared/domain/ports';
 
-/** Errores */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+/** Excepciones de dominio */
+import {
+  InvalidEmailException,
+  InvalidPasswordException,
+} from '../../../domain/exceptions';
+import {
+  InvalidFullnameException,
+  InvalidPhoneException,
+} from '../../../../shared/domain/exceptions';
 
-/** Use case */
+/** Casos de uso */
 import { CreateAccountUseCase } from './create-account.usecase';
-import { CreateAccountDto } from '../../../infrastructure/dto';
 
-/** Utilidades */
-import { buildAccount } from '../../../../shared/application/utils/domain-class-contructor';
+/** Commands */
+import { CreateAccountCommand } from '../../commands';
 
-jest.mock('uuid', () => ({
-  v4: jest.fn(),
-}));
+/** Excepciones de aplicación */
+import { AccountAlreadyExistsException } from '../../exceptions';
 
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(),
-}));
+type AccountRepositoryMock = Pick<
+  AccountRepositoryPort,
+  'verifyByEmail' | 'create'
+>;
+type UserRepositoryMock = Pick<UserRepositoryPort, 'create'>;
+type TransactionManagerMock = Pick<TransactionManagerPort, 'run'>;
+type EncryptorMock = Pick<EncryptorPort, 'compare' | 'hash'>;
+type IdGeneratorMock = Pick<IdGeneratorPort, 'generate'>;
 
 describe('CreateAccountUseCase', () => {
   let useCase: CreateAccountUseCase;
+  let accountRepositoryMock: jest.Mocked<AccountRepositoryMock>;
+  let userRepositoryMock: jest.Mocked<UserRepositoryMock>;
+  let transactionManagerMock: jest.Mocked<TransactionManagerMock>;
+  let encryptorMock: jest.Mocked<EncryptorMock>;
+  let idGeneratorMock: jest.Mocked<IdGeneratorMock>;
 
-  const mockAccountRepository = {
-    findByEmail: jest.fn<Promise<Account | null>, [string]>(),
-    create: jest.fn<Promise<void>, [Account, object]>(),
-  } satisfies Pick<AccountRepositoryPort, 'findByEmail' | 'create'>;
-
-  const mockUserRepository = {
-    create: jest.fn<Promise<void>, [User, object]>(),
-  } satisfies Pick<UserRepositoryPort, 'create'>;
-
-  const mockTransactionManager = {
-    run: jest.fn(),
-  } satisfies TransactionManagerPort;
-
-  const createAccountDto: CreateAccountDto = {
+  const createAccountCommand: CreateAccountCommand = {
     fullname: 'John Doe',
-    phone: '+1234567890',
+    phone: '3105668544',
     email: 'john@example.com',
-    password: 'SecurePass123!',
-    role: { roleId: 'role-123', name: 'Administrador' },
+    password: 'SecurePass123!@',
+    roleId: 'test-role-id',
   };
 
-  const accountId = '11111111-1111-4111-8111-111111111111';
-  const userId = '22222222-2222-4222-8222-222222222222';
+  const accountId = 'test-account-id';
+  const userId = 'test-user-id';
+  const hashedPassword = 'test-hashed-password';
 
   const transactionContext: TransactionContext = {};
 
-  beforeEach(async () => {
-    jest.resetAllMocks();
+  beforeEach(() => {
+    accountRepositoryMock = {
+      verifyByEmail: jest.fn(),
+      create: jest.fn(),
+    };
+    userRepositoryMock = {
+      create: jest.fn(),
+    };
+    transactionManagerMock = {
+      run: jest.fn(
+        <T>(
+          callback: (context: TransactionContext) => Promise<T>,
+        ): Promise<T> => {
+          return callback(transactionContext);
+        },
+      ),
+    } as jest.Mocked<TransactionManagerMock>;
+    encryptorMock = {
+      compare: jest.fn(),
+      hash: jest.fn().mockResolvedValueOnce(hashedPassword),
+    };
+    idGeneratorMock = {
+      generate: jest
+        .fn()
+        .mockReturnValueOnce(accountId)
+        .mockReturnValueOnce(userId),
+    };
 
-    (uuidv4 as jest.Mock)
-      .mockReturnValueOnce(accountId)
-      .mockReturnValueOnce(userId);
-
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-
-    mockTransactionManager.run.mockImplementation(
-      async (callback: (transactionContext: unknown) => Promise<unknown>) =>
-        callback(transactionContext),
+    useCase = new CreateAccountUseCase(
+      accountRepositoryMock as unknown as AccountRepositoryPort,
+      userRepositoryMock as unknown as UserRepositoryPort,
+      transactionManagerMock,
+      encryptorMock,
+      idGeneratorMock,
     );
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CreateAccountUseCase,
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: mockAccountRepository,
-        },
-        {
-          provide: USER_REPOSITORY,
-          useValue: mockUserRepository,
-        },
-        {
-          provide: TRANSACTION_MANAGER,
-          useValue: mockTransactionManager,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get(CreateAccountUseCase);
+    jest.clearAllMocks();
   });
 
   describe('run()', () => {
-    it('debe lanzar un error cuando el email ya existe', async () => {
+    it('deberia lanzar un InvalidEmailException si el correo electrónico es invalido', async () => {
       // Arrange
-      const existingEmail: string = 'existing-email@gmail.com';
-
-      const existingAccount = buildAccount({
-        accountId: 'existing-id',
-        email: existingEmail,
-        passwordHash: 'existing-password-hash',
-        mustChangePassword: false,
-        failedAttempts: 0,
-      });
-
-      mockAccountRepository.findByEmail.mockResolvedValue(existingAccount);
+      const command = {
+        ...createAccountCommand,
+        email: 'jhon.doe',
+      };
 
       // Act
-      const result = useCase.run({ ...createAccountDto, email: existingEmail });
+      const result = useCase.run(command);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountAlreadyExists,
-        httpCode: 409,
+      await expect(result).rejects.toThrow(InvalidEmailException);
+
+      expect(accountRepositoryMock.verifyByEmail).not.toHaveBeenCalled();
+      expect(idGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+      expect(userRepositoryMock.create).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.create).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar un InvalidPasswordException si la contraseña es invalida', async () => {
+      // Arrange
+      const command = {
+        ...createAccountCommand,
+        password: '123456',
+      };
+
+      // Act
+      const result = useCase.run(command);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidPasswordException);
+
+      expect(accountRepositoryMock.verifyByEmail).not.toHaveBeenCalled();
+      expect(idGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+      expect(userRepositoryMock.create).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.create).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar un InvalidFullnameException si el nombre tiene un formato invalido', async () => {
+      // Arrange
+      const command = {
+        ...createAccountCommand,
+        fullname: 'n',
+      };
+
+      // Act
+      const result = useCase.run(command);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidFullnameException);
+
+      expect(accountRepositoryMock.verifyByEmail).not.toHaveBeenCalled();
+      expect(idGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+      expect(userRepositoryMock.create).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.create).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar un InvalidPhoneException si el teléfono tiene un formato invalido', async () => {
+      // Arrange
+      const command = {
+        ...createAccountCommand,
+        phone: '456154a',
+      };
+
+      // Act
+      const result = useCase.run(command);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidPhoneException);
+
+      expect(accountRepositoryMock.verifyByEmail).not.toHaveBeenCalled();
+      expect(idGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+      expect(userRepositoryMock.create).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.create).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar un AccountAlreadyExistsException cuando el email ya existe', async () => {
+      // Arrange
+      const existingEmail: string = 'juan.doe@example.com';
+
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(true);
+
+      // Act
+      const result = useCase.run({
+        ...createAccountCommand,
+        email: existingEmail,
       });
 
-      expect(mockAccountRepository.findByEmail).toHaveBeenCalledWith(
+      // Assert
+      await expect(result).rejects.toThrow(AccountAlreadyExistsException);
+
+      expect(accountRepositoryMock.verifyByEmail).toHaveBeenCalledWith(
         existingEmail,
       );
 
-      expect(mockTransactionManager.run).not.toHaveBeenCalled();
-      expect(mockAccountRepository.create).not.toHaveBeenCalled();
-      expect(mockUserRepository.create).not.toHaveBeenCalled();
+      expect(idGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+      expect(userRepositoryMock.create).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.create).not.toHaveBeenCalled();
     });
 
     it('debe crear la cuenta y el usuario dentro de una transacción', async () => {
       // Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       // Act
-      await useCase.run(createAccountDto);
+      await useCase.run(createAccountCommand);
 
       // Assert
-      expect(mockAccountRepository.findByEmail).toHaveBeenCalledWith(
-        createAccountDto.email,
+      expect(accountRepositoryMock.verifyByEmail).toHaveBeenCalledWith(
+        createAccountCommand.email,
       );
 
-      expect(mockTransactionManager.run).toHaveBeenCalledTimes(1);
+      expect(transactionManagerMock.run).toHaveBeenCalledTimes(1);
 
-      expect(mockAccountRepository.create).toHaveBeenCalledTimes(1);
+      expect(userRepositoryMock.create).toHaveBeenCalledTimes(1);
 
-      expect(mockUserRepository.create).toHaveBeenCalledTimes(1);
+      expect(accountRepositoryMock.create).toHaveBeenCalledTimes(1);
 
-      expect(mockAccountRepository.create).toHaveBeenCalledWith(
-        expect.any(Account),
+      expect(userRepositoryMock.create).toHaveBeenCalledWith(
+        expect.any(User),
         transactionContext,
       );
 
-      expect(mockUserRepository.create).toHaveBeenCalledWith(
-        expect.any(User),
+      expect(accountRepositoryMock.create).toHaveBeenCalledWith(
+        expect.any(Account),
         transactionContext,
       );
     });
 
     it('debe crear la cuenta con los datos correctos', async () => {
       // Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       //Act
-      await useCase.run(createAccountDto);
+      await useCase.run(createAccountCommand);
 
-      const createdAccount = mockAccountRepository.create.mock.calls[0][0];
+      const createdAccount = accountRepositoryMock.create.mock.calls[0][0];
 
       //Assert
-      expect(createdAccount.accountId).toBe(accountId);
-      expect(createdAccount.email).toBe(createAccountDto.email);
-      expect(createdAccount.passwordHash).toBe('hashed-password');
-      expect(createdAccount.mustChangePassword).toBe(false);
-      expect(createdAccount.failedAttempts).toBe(0);
+      expect(createdAccount.getAccountId).toBe(accountId);
+      expect(createdAccount.getEmail).toBe(createAccountCommand.email);
+      expect(createdAccount.getPasswordHash).toBe(hashedPassword);
+      expect(createdAccount.getMustChangePassword).toBe(false);
+      expect(createdAccount.getFailedAttempts).toBe(0);
     });
 
     it('debe crear el usuario con los datos correctos', async () => {
       //Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      const normalizedPhone = `+57${createAccountCommand.phone}`;
+
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       //Act
-      await useCase.run(createAccountDto);
+      await useCase.run(createAccountCommand);
 
-      const createdUser = mockUserRepository.create.mock.calls[0][0];
+      const createdUser = userRepositoryMock.create.mock.calls[0][0];
 
       //Assert
-      expect(createdUser.userId).toBe(userId);
-      expect(createdUser.fullname).toBe(createAccountDto.fullname);
-      expect(createdUser.role).toMatchObject(createAccountDto.role);
-      expect(createdUser.phone).toBe(createAccountDto.phone);
-      expect(createdUser.isActive).toBe(true);
+      expect(createdUser.getUserId).toBe(userId);
+      expect(createdUser.getFullname).toBe(createAccountCommand.fullname);
+      expect(createdUser.getRoleId).toBe(createAccountCommand.roleId);
+      expect(createdUser.getPhone).toBe(normalizedPhone.trim());
+      expect(createdUser.getIsActive).toBe(true);
     });
 
     it('debe asociar el cuenta con el perfil creado', async () => {
       //Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       //Act
-      await useCase.run(createAccountDto);
+      await useCase.run(createAccountCommand);
 
-      const createdUser = mockUserRepository.create.mock.calls[0][0];
-      const createdAccount = mockAccountRepository.create.mock.calls[0][0];
+      const createdUser = userRepositoryMock.create.mock.calls[0][0];
+      const createdAccount = accountRepositoryMock.create.mock.calls[0][0];
 
       //Assert
-      expect(createdAccount.profile.userId).toBe(createdUser.userId);
+      expect(createdAccount.getProfileId).toBe(createdUser.getUserId);
     });
 
-    it('debe generar el hash de la contraseña con bcrypt', async () => {
+    it('debe generar el hash de la contraseña con el cifrador', async () => {
       //Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       //Act
-      await useCase.run(createAccountDto);
+      await useCase.run(createAccountCommand);
 
       //Assert
-      expect(bcrypt.hash).toHaveBeenCalledWith(createAccountDto.password, 10);
+      expect(encryptorMock.hash).toHaveBeenCalledWith(
+        createAccountCommand.password,
+        14,
+      );
 
-      const createdAccount = mockAccountRepository.create.mock.calls[0][0];
+      const createdAccount = accountRepositoryMock.create.mock.calls[0][0];
 
-      expect(createdAccount.passwordHash).toBe('hashed-password');
+      expect(createdAccount.getPasswordHash).toBe(hashedPassword);
     });
 
     it('debe utilizar el mismo contexto transaccional para Account y User', async () => {
       // Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       // Act
-      await useCase.run(createAccountDto);
+      await useCase.run(createAccountCommand);
 
-      const accountCall = mockAccountRepository.create.mock.calls[0];
-
-      const userCall = mockUserRepository.create.mock.calls[0];
+      const accountCall = accountRepositoryMock.create.mock.calls[0];
+      const userCall = userRepositoryMock.create.mock.calls[0];
 
       // Assert
       expect(accountCall[1]).toBe(transactionContext);
@@ -248,38 +325,38 @@ describe('CreateAccountUseCase', () => {
 
     it('debe propagar el error si falla la creación del usuario', async () => {
       //Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       const databaseError = new Error('Foreign key constraint failed');
 
-      mockUserRepository.create.mockRejectedValue(databaseError);
+      userRepositoryMock.create.mockRejectedValue(databaseError);
 
       //Act
-      const result = useCase.run(createAccountDto);
+      const result = useCase.run(createAccountCommand);
 
       //Assert
       await expect(result).rejects.toThrow(databaseError.message);
 
-      expect(mockUserRepository.create).toHaveBeenCalledTimes(1);
-      expect(mockAccountRepository.create).not.toHaveBeenCalled();
+      expect(userRepositoryMock.create).toHaveBeenCalledTimes(1);
+      expect(accountRepositoryMock.create).not.toHaveBeenCalled();
     });
 
     it('debe propagar el error si falla la creación de la cuenta', async () => {
       // Arrange
-      mockAccountRepository.findByEmail.mockResolvedValue(null);
+      accountRepositoryMock.verifyByEmail.mockResolvedValue(false);
 
       const databaseError = new Error('Database constraint violation');
 
-      mockAccountRepository.create.mockRejectedValue(databaseError);
+      accountRepositoryMock.create.mockRejectedValue(databaseError);
 
       //Act
-      const result = useCase.run(createAccountDto);
+      const result = useCase.run(createAccountCommand);
 
       //Assert
       await expect(result).rejects.toThrow(databaseError.message);
 
-      expect(mockUserRepository.create).toHaveBeenCalledTimes(1);
-      expect(mockAccountRepository.create).toHaveBeenCalledTimes(1);
+      expect(userRepositoryMock.create).toHaveBeenCalledTimes(1);
+      expect(accountRepositoryMock.create).toHaveBeenCalledTimes(1);
     });
   });
 });

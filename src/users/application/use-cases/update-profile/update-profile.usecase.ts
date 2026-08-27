@@ -5,7 +5,7 @@ import { UserRepositoryPort } from '../../../domain/ports';
 import { UserNotFoundException } from '../../exceptions';
 
 /** Value Objects */
-import { Fullname, Phone } from '../../../domain/value-objects';
+import { Fullname, Phone } from '../../../../shared/domain/value-objects';
 
 /** Commands */
 import { UpdateUserCommand } from '../../commands';
@@ -18,16 +18,16 @@ export class UpdateProfileUseCase {
     updateUserCommand: UpdateUserCommand,
   ): Promise<void> {
     const fullname = updateUserCommand.fullname
-      ? Fullname.create(updateUserCommand.fullname).toString()
+      ? Fullname.create(updateUserCommand.fullname)
       : undefined;
 
     const phone = updateUserCommand.phone
-      ? Phone.create(updateUserCommand.phone).toString()
+      ? Phone.create(updateUserCommand.phone)
       : undefined;
 
     const affectedRows = await this.userRepository.updateProfile(profileId, {
-      fullname,
-      phone,
+      fullname: fullname?.toString(),
+      phone: phone?.toString(),
     });
 
     if (affectedRows === 0)

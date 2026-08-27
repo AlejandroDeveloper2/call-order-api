@@ -4,6 +4,7 @@ import { User } from '../../../../users/domain/entities';
 
 /** Value Objects */
 import { Email, Password } from '../../../domain/value-objects';
+import { Fullname, Phone } from '../../../../shared/domain/value-objects';
 
 /** Puertos */
 import { AccountRepositoryPort, EncryptorPort } from '../../../domain/ports';
@@ -30,11 +31,18 @@ export class CreateAccountUseCase {
   ) {}
 
   async run(createAccountCommand: CreateAccountCommand): Promise<void> {
-    const email = Email.create(createAccountCommand.email).toString();
-    const password = Password.create(createAccountCommand.password).toString();
+    /** Validar entradas con los value objects */
+    const email = Email.create(createAccountCommand.email);
+    const password = Password.create(createAccountCommand.password);
+    const fullname = Fullname.create(createAccountCommand.fullname);
+    const phone = createAccountCommand.phone
+      ? Phone.create(createAccountCommand.phone)
+      : undefined;
 
     /** Validar si existe otra cuenta asociada con el correo ingresado */
-    const accountExists = await this.accountRepository.verifyByEmail(email);
+    const accountExists = await this.accountRepository.verifyByEmail(
+      email.toString(),
+    );
 
     if (accountExists)
       throw new AccountAlreadyExistsException(
@@ -46,20 +54,20 @@ export class CreateAccountUseCase {
     const userId = this.idGenerator.generate();
 
     /** Generar hash de contraseña */
-    const passwordHash = await this.encryptor.hash(password, 14);
+    const passwordHash = await this.encryptor.hash(password.toString(), 14);
 
     /** Crear las instancias de dominio de la cuenta y el usuario */
     const user = User.create(
       userId,
-      createAccountCommand.fullname,
+      fullname.toString(),
       createAccountCommand.roleId,
       undefined,
-      createAccountCommand.phone,
+      phone?.toString(),
     );
 
     const account = Account.create(
       accountId,
-      email,
+      email.toString(),
       passwordHash,
       false,
       0,
