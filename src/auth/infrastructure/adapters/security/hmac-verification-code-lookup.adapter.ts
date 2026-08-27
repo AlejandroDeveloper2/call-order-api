@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-import { VerificationCodeLookupPort } from '../../domain/ports';
+import { VerificationCodeLookupPort } from '../../../domain/ports';
 
 export class HmacVerificationCodeLookupAdapter implements VerificationCodeLookupPort {
   constructor(private readonly secret: string) {}

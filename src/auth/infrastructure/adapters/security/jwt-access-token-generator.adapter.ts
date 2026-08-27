@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 /** Puertos */
-import { AccessTokenGeneratorPort } from '../../domain/ports';
+import { AccessTokenGeneratorPort } from '../../../domain/ports';
 
 /** Tipos */
-import { AccessTokenPayload } from '../../domain/types';
+import { AccessTokenPayload } from '../../../domain/types';
 
 @Injectable()
 export class JwtAccessTokenGeneratorAdapter implements AccessTokenGeneratorPort {

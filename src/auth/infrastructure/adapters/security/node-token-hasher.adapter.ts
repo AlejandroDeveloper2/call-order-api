@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { TokenHasherPort } from '../../domain/ports';
+import { TokenHasherPort } from '../../../domain/ports';
 
 export class NodeTokenHasherAdapter implements TokenHasherPort {
   hash(token: string): string {

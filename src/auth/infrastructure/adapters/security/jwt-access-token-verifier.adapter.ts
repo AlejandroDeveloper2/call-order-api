@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
-import { AccessTokenVerifierPort } from '../../domain/ports';
+import { AccessTokenVerifierPort } from '../../../domain/ports';
 
-import { AccessTokenPayload } from '../../domain/types';
+import { AccessTokenPayload } from '../../../domain/types';
 
 @Injectable()
 export class JwtAccessTokenVerifierAdapter implements AccessTokenVerifierPort {

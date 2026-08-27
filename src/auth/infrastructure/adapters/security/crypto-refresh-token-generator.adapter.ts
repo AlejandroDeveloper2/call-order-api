@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import crypto from 'crypto';
 
-import { RefreshTokenGeneratorPort } from '../../domain/ports';
+import { RefreshTokenGeneratorPort } from '../../../domain/ports';
 
 @Injectable()
 export class CryptoRefreshTokenGeneratorAdapter implements RefreshTokenGeneratorPort {
