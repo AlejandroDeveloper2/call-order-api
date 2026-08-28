@@ -22,7 +22,7 @@ import {
 } from '../../exceptions';
 
 /** Value Objects */
-import { Code, Email, Password } from '../../../domain/value-objects';
+import { Code, Email } from '../../../domain/value-objects';
 
 /** Modelos de lectura */
 import { AccountLoginModel } from '../../../domain/models';
@@ -42,11 +42,13 @@ export class LoginUseCase {
   ) {}
 
   async run(loginCommand: LoginCommand): Promise<void> {
-    /** Validamos la entradacon el value object  */
-    const email = Email.create(loginCommand.email).toString();
+    /** Validamos la entrada con el value object  */
+    const email = Email.create(loginCommand.email);
 
     /** Buscamos la cuenta asociada al email proporcionado */
-    const account = await this.accountRepository.findForLoginByEmail(email);
+    const account = await this.accountRepository.findForLoginByEmail(
+      email.toString(),
+    );
 
     /** Validamos si las credenciales son validas */
     if (!account)
@@ -69,11 +71,9 @@ export class LoginUseCase {
     if (!account.profile.isActive)
       throw new InactiveAccountException('Usuario inactivo');
 
-    const password = Password.create(loginCommand.password).toString();
-
     /** Validar si la contraseña es valida */
     const isCorrectPassword = await this.encryptor.compare(
-      password,
+      loginCommand.password,
       account.passwordHash,
     );
 
@@ -87,7 +87,10 @@ export class LoginUseCase {
     }
 
     /** Generar, crear y enviar el código de verificación de identidad al correo del usuario */
-    await this.generateAndSendVerificationCode({ ...account, email });
+    await this.generateAndSendVerificationCode({
+      ...account,
+      email: email.toString(),
+    });
   }
 
   private isLockExpired(lockedUtil: Date): boolean {
@@ -108,13 +111,11 @@ export class LoginUseCase {
         ? this.dateHandler.addHours(new Date(), 2)
         : undefined;
 
-    if (lockedUtil) {
-      await this.accountRepository.block(
-        account.accountId,
-        lockedUtil,
-        failedAttempts,
-      );
-    }
+    await this.accountRepository.block(
+      account.accountId,
+      failedAttempts,
+      lockedUtil,
+    );
   }
 
   private async generateAndSendVerificationCode(
@@ -122,11 +123,13 @@ export class LoginUseCase {
   ): Promise<void> {
     const codeId = this.idGenerator.generate();
 
-    const codeValue = Code.create(VerificationCode.generate()).toString();
+    const code = Code.create(VerificationCode.generate());
 
-    const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
+    const codeLookup = this.verificationCodeLookup.generateLookup(
+      code.toString(),
+    );
 
-    const codeHash = await this.encryptor.hash(codeValue, 10);
+    const codeHash = await this.encryptor.hash(code.toString(), 10);
 
     const verificationCode = VerificationCode.create(
       codeId,
@@ -142,7 +145,7 @@ export class LoginUseCase {
     await this.emailSender.sendEmail(
       account.email,
       'Código de verificación de CallOrder',
-      this.buildVerificationEmail(codeValue),
+      this.buildVerificationEmail(code.toString()),
     );
   }
 

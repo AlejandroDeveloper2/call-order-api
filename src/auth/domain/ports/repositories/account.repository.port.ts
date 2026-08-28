@@ -52,8 +52,8 @@ export abstract class AccountRepositoryPort {
 
   abstract block(
     accountId: string,
-    lockedUntil: Date,
     failedAttempts: number,
+    lockedUntil?: Date,
   ): Promise<number>;
 
   abstract unlock(accountId: string): Promise<number>;

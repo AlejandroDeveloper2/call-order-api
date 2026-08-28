@@ -1,353 +1,449 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
-import { addHours } from 'date-fns';
+import { VerificationCode } from '../../../domain/entities';
+
+/** Excepciones de dominio */
+import {
+  InvalidCodeFormatException,
+  InvalidEmailException,
+} from '../../../domain/exceptions';
+
+/** Modelos de lectura */
+import { AccountLoginModel } from '../../../domain/models';
 
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
-  VERIFICATION_CODE_REPOSITORY,
+  DateHandlerPort,
+  EncryptorPort,
+  VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
 import {
-  EMAIL_SENDER_KEY,
   EmailSenderPort,
+  IdGeneratorPort,
 } from '../../../../shared/domain/ports';
 
-/** Tipos */
-import { UpdateAccountMetaInput } from '../../../domain/types';
-
-/** Errores */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
-
-/** Utils */
-import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
-
-/** DTO */
-import { LoginDto } from '../../../infrastructure/dto';
+/** Commands */
+import { LoginCommand } from '../../commands';
 
 /** Caso de uso */
 import { LoginUseCase } from './login.usecase';
 
-/** Utilidades */
+/** Excepciones de aplicación */
 import {
-  buildAccount,
-  buildProfile,
-} from '../../../../shared/application/utils/domain-class-contructor';
-import { VerificationCode } from '../../../domain/entities';
+  AccountLockedException,
+  InactiveAccountException,
+  InvalidCredentialsException,
+} from '../../exceptions';
 
-jest.mock('bcrypt', () => ({
-  compare: jest.fn(),
-  hash: jest.fn(),
-}));
-
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-verification-code-id'),
-}));
-
-jest.mock('../../../domain/utils/generate-validation-code', () => ({
-  generateVerificationCode: jest.fn(() => '123456'),
-}));
+type AccountRepositoryMock = Pick<
+  AccountRepositoryPort,
+  'findForLoginByEmail' | 'block' | 'unlock'
+>;
+type VerificationCodeRepositoryMock = Pick<
+  VerificationCodeRepositoryPort,
+  'create'
+>;
+type EmailSenderMock = Pick<EmailSenderPort, 'sendEmail'>;
+type EncryptorMock = Pick<EncryptorPort, 'compare' | 'hash'>;
+type IdGeneratorMock = Pick<IdGeneratorPort, 'generate'>;
+type VerificationCodeLookupMock = Pick<
+  VerificationCodeLookupPort,
+  'generateLookup'
+>;
+type DateHandlerMock = Pick<DateHandlerPort, 'addHours' | 'addMinutes'>;
 
 describe('LoginUseCase', () => {
   let useCase: LoginUseCase;
+  let accountRepositoryMock: jest.Mocked<AccountRepositoryMock>;
+  let verificationCodeRepositoryMock: jest.Mocked<VerificationCodeRepositoryMock>;
+  let emailSenderMock: jest.Mocked<EmailSenderMock>;
+  let encryptorMock: jest.Mocked<EncryptorMock>;
+  let idGeneratorMock: jest.Mocked<IdGeneratorMock>;
+  let verificationCodeLookupMock: jest.Mocked<VerificationCodeLookupMock>;
+  let dateHandlerMock: jest.Mocked<DateHandlerMock>;
 
-  const accountRepository = {
-    findByEmail: jest.fn(),
-    update: jest.fn<Promise<number>, [string, UpdateAccountMetaInput]>(),
-  } satisfies Pick<AccountRepositoryPort, 'findByEmail' | 'update'>;
+  const loginCommand: LoginCommand = {
+    email: 'jhon.doe@example.com',
+    password: 'Password123@',
+  };
 
-  const verificationCodeRepository = {
-    create: jest.fn(),
-  } satisfies Pick<VerificationCodeRepositoryPort, 'create'>;
+  beforeEach(() => {
+    accountRepositoryMock = {
+      findForLoginByEmail: jest.fn(),
+      block: jest.fn(),
+      unlock: jest.fn(),
+    };
 
-  const emailSender = {
-    sendEmail: jest.fn(),
-  } satisfies Pick<EmailSenderPort, 'sendEmail'>;
+    verificationCodeRepositoryMock = {
+      create: jest.fn(),
+    };
 
-  const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => Promise<boolean>
-  >(bcrypt.compare);
-  const bcryptHashMock = jest.mocked<
-    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
-  >(bcrypt.hash);
+    emailSenderMock = {
+      sendEmail: jest.fn(),
+    };
 
-  const generateVerificationCodeMock = jest.mocked(generateVerificationCode);
+    encryptorMock = {
+      compare: jest.fn(),
+      hash: jest.fn(),
+    };
 
-  const buildLoginDto = (overrides: Partial<LoginDto> = {}): LoginDto => ({
-    email: 'test@gmail.com',
-    password: 'test-password',
-    ...overrides,
-  });
+    idGeneratorMock = {
+      generate: jest.fn(),
+    };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LoginUseCase,
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: accountRepository,
-        },
-        {
-          provide: VERIFICATION_CODE_REPOSITORY,
-          useValue: verificationCodeRepository,
-        },
-        {
-          provide: EMAIL_SENDER_KEY,
-          useValue: emailSender,
-        },
-      ],
-    }).compile();
+    verificationCodeLookupMock = {
+      generateLookup: jest.fn(),
+    };
 
-    useCase = module.get<LoginUseCase>(LoginUseCase);
+    dateHandlerMock = {
+      addHours: jest.fn(),
+      addMinutes: jest.fn(),
+    };
+
+    useCase = new LoginUseCase(
+      accountRepositoryMock as unknown as AccountRepositoryPort,
+      verificationCodeRepositoryMock as unknown as VerificationCodeRepositoryPort,
+      emailSenderMock,
+      encryptorMock,
+      idGeneratorMock,
+      verificationCodeLookupMock,
+      dateHandlerMock as unknown as DateHandlerPort,
+    );
 
     jest.clearAllMocks();
   });
 
-  describe('run', () => {
-    it('debe lanzar INVALID_CREDENTIALS cuando la cuenta no existe', async () => {
-      // Arrange
-      const dto = buildLoginDto({ email: 'wrong-test@gmail.com' });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-      accountRepository.findByEmail.mockResolvedValue(null);
+  describe('run', () => {
+    it('deberia lanzar InvalidEmailException si el correo es invalido', async () => {
+      // Arrange
+      const invalidEmail = 'jhon.doe';
 
       // Act
-      const result = useCase.run(dto);
+      const result = useCase.run({ ...loginCommand, email: invalidEmail });
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidCredentials,
-        httpCode: 401,
-      });
+      await expect(result).rejects.toThrow(InvalidEmailException);
 
-      expect(accountRepository.findByEmail).toHaveBeenCalledWith(dto.email);
-
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.findForLoginByEmail).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.unlock).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.block).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.create).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar LOGIN_LOCKED cuando la cuenta está bloqueada', async () => {
+    it('debe lanzar InvalidCredentialsException cuando la cuenta no existe', async () => {
       // Arrange
-      const dto = buildLoginDto();
+      const command = { ...loginCommand, email: 'tom.doe@example.com' };
 
-      const account = buildAccount({
-        lockedUntil: addHours(new Date(), 1),
-      });
-
-      accountRepository.findByEmail.mockResolvedValue(account);
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(null);
 
       // Act
-      const result = useCase.run(dto);
+      const result = useCase.run(command);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.loginLocked,
-        httpCode: 403,
-      });
+      await expect(result).rejects.toThrow(InvalidCredentialsException);
 
-      expect(accountRepository.findByEmail).toHaveBeenCalledWith(dto.email);
+      expect(accountRepositoryMock.findForLoginByEmail).toHaveBeenCalledWith(
+        command.email,
+      );
 
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.unlock).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.block).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.create).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar AccountLockedException cuando la cuenta está bloqueada', async () => {
+      // Arrange
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
+        failedAttempts: 0,
+        profile: {
+          isActive: true,
+        },
+        lockedUntil: new Date(Date.now() + 60 * 60 * 1000),
+      };
+
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
+
+      // Act
+      const result = useCase.run(loginCommand);
+
+      // Assert
+      await expect(result).rejects.toThrow(AccountLockedException);
+
+      expect(accountRepositoryMock.findForLoginByEmail).toHaveBeenCalledWith(
+        loginCommand.email,
+      );
+
+      expect(accountRepositoryMock.unlock).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.block).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.create).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
     });
 
     it('debe resetear el bloqueo cuando este ha expirado', async () => {
       // Arrange
-      const dto = buildLoginDto();
-
-      const account = buildAccount({
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
         failedAttempts: 4,
+        profile: {
+          isActive: true,
+        },
         lockedUntil: new Date(Date.now() - 1_000),
-      });
+      };
 
-      accountRepository.findByEmail.mockResolvedValue(account);
-      accountRepository.update.mockResolvedValue(1);
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
 
-      bcryptCompareMock.mockResolvedValue(true);
+      accountRepositoryMock.unlock.mockResolvedValue(1);
 
-      bcryptHashMock.mockResolvedValue('verification-code-hash');
+      encryptorMock.compare.mockResolvedValue(true);
 
-      verificationCodeRepository.create.mockResolvedValue(undefined);
-      emailSender.sendEmail.mockResolvedValue(undefined);
+      encryptorMock.hash.mockResolvedValue('verification-code-hash');
+
+      verificationCodeRepositoryMock.create.mockResolvedValue(undefined);
+      emailSenderMock.sendEmail.mockResolvedValue(undefined);
 
       // Act
-      const result = await useCase.run(dto);
+      const result = await useCase.run(loginCommand);
 
       // Assert
-      expect(result).toBe(account.accountId);
+      expect(result).toBeUndefined();
 
-      expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
-        failedAttempts: 0,
-        lockedUtil: undefined,
-      });
+      expect(accountRepositoryMock.unlock).toHaveBeenCalledWith(
+        account.accountId,
+      );
 
       expect(account.failedAttempts).toBe(0);
       expect(account.lockedUntil).toBeUndefined();
 
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        dto.password,
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
+        loginCommand.password,
         account.passwordHash,
       );
 
-      expect(verificationCodeRepository.create).toHaveBeenCalledTimes(1);
-      expect(emailSender.sendEmail).toHaveBeenCalledTimes(1);
+      expect(verificationCodeRepositoryMock.create).toHaveBeenCalledTimes(1);
+      expect(emailSenderMock.sendEmail).toHaveBeenCalledTimes(1);
     });
 
-    it('debe lanzar INACTIVE_ACCOUNT cuando el perfil de la cuenta está inactivo', async () => {
+    it('debe lanzar InactiveAccountException cuando el perfil de la cuenta está inactivo', async () => {
       // Arrange
-      const dto = buildLoginDto();
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
+        failedAttempts: 0,
+        profile: {
+          isActive: false,
+        },
+      };
 
-      const profile = buildProfile({ isActive: false });
-      const account = buildAccount({ profile });
-
-      accountRepository.findByEmail.mockResolvedValue(account);
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
 
       // Act
-      const result = useCase.run(dto);
+      const result = useCase.run(loginCommand);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.inactiveAccount,
-        httpCode: 403,
-      });
+      await expect(result).rejects.toThrow(InactiveAccountException);
 
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(accountRepositoryMock.block).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.create).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
     });
 
     it('debe incrementar los intentos fallidos cuando la contraseña es incorrecta', async () => {
       // Arrange
-      const dto = buildLoginDto({
-        password: 'password-incorrecto',
-      });
+      const command = {
+        ...loginCommand,
+        password: 'wrongPassword12@',
+      };
 
-      const account = buildAccount({
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
         failedAttempts: 2,
-      });
+        profile: {
+          isActive: true,
+        },
+      };
 
-      accountRepository.findByEmail.mockResolvedValue(account);
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
 
-      bcryptCompareMock.mockResolvedValue(false);
+      encryptorMock.compare.mockResolvedValue(false);
 
-      accountRepository.update.mockResolvedValue(1);
+      accountRepositoryMock.block.mockResolvedValue(1);
 
       // Act
-      const result = useCase.run(dto);
+      const result = useCase.run(command);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidCredentials,
-        httpCode: 401,
-      });
+      await expect(result).rejects.toThrow(InvalidCredentialsException);
 
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        dto.password,
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
+        command.password,
         account.passwordHash,
       );
 
-      expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
-        failedAttempts: 3,
-        lockedUtil: undefined,
-      });
+      expect(accountRepositoryMock.block).toHaveBeenCalledWith(
+        account.accountId,
+        3,
+        undefined,
+      );
 
-      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.create).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
     });
 
     it('debe bloquear la cuenta durante dos horas al alcanzar cinco intentos fallidos', async () => {
       // Arrange
-      const dto = buildLoginDto({
-        password: 'password-incorrecto',
-      });
-
-      const account = buildAccount({
-        failedAttempts: 4,
-      });
-
-      accountRepository.findByEmail.mockResolvedValue(account);
-
-      bcryptCompareMock.mockResolvedValue(false);
-
-      accountRepository.update.mockResolvedValue(1);
-
-      // Act
-      const result = useCase.run(dto);
-
-      // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidCredentials,
-        httpCode: 401,
-      });
-
-      expect(accountRepository.update).toHaveBeenCalledWith(account.accountId, {
-        failedAttempts: 5,
-        lockedUtil: expect.any(Date) as Date,
-      });
-
-      const updateCall = accountRepository.update.mock.calls[0];
-
-      const updateData = updateCall[1] as {
-        failedAttempts: number;
-        lockedUtil?: Date;
+      const command = {
+        ...loginCommand,
+        password: 'wrongPassword12@',
       };
 
-      expect(updateData.lockedUtil).toBeInstanceOf(Date);
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
+        failedAttempts: 4,
+        profile: {
+          isActive: true,
+        },
+      };
+      const lockedUntil = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
-      expect(updateData.lockedUtil!.getTime()).toBeGreaterThan(Date.now());
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
 
-      expect(verificationCodeRepository.create).not.toHaveBeenCalled();
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      encryptorMock.compare.mockResolvedValue(false);
+
+      dateHandlerMock.addHours.mockReturnValue(lockedUntil);
+
+      accountRepositoryMock.block.mockResolvedValue(1);
+
+      // Act
+      const result = useCase.run(command);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidCredentialsException);
+
+      expect(accountRepositoryMock.block).toHaveBeenCalledWith(
+        account.accountId,
+        5,
+        lockedUntil,
+      );
+
+      const updateCall = accountRepositoryMock.block.mock.calls[0];
+
+      const updatedLockedUntil = updateCall[2];
+
+      expect(updatedLockedUntil).toBeInstanceOf(Date);
+
+      expect(updatedLockedUntil?.getTime()).toBeGreaterThan(Date.now());
+
+      expect(verificationCodeRepositoryMock.create).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar InvalidCodeFormatException si el código tiene un formato no valido', async () => {
+      // Arrange
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
+        failedAttempts: 0,
+        profile: {
+          isActive: true,
+        },
+      };
+
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
+
+      encryptorMock.compare.mockResolvedValue(true);
+
+      jest.spyOn(VerificationCode, 'generate').mockReturnValue('12345');
+
+      // Act
+      const result = useCase.run(loginCommand);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidCodeFormatException);
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(VerificationCode.generate).toHaveBeenCalledTimes(1);
     });
 
     it('debe generar y enviar el código de verificación cuando las credenciales son válidas', async () => {
       // Arrange
-      const dto = buildLoginDto();
+      const account: AccountLoginModel = {
+        accountId: 'test-account-id',
+        passwordHash: 'test-password-hash',
+        failedAttempts: 0,
+        profile: {
+          isActive: true,
+        },
+      };
 
-      const account = buildAccount();
+      accountRepositoryMock.findForLoginByEmail.mockResolvedValue(account);
 
-      accountRepository.findByEmail.mockResolvedValue(account);
+      encryptorMock.compare.mockResolvedValue(true);
 
-      bcryptCompareMock.mockResolvedValue(true);
+      encryptorMock.hash.mockResolvedValue('verification-code-hash');
 
-      bcryptHashMock.mockResolvedValue('verification-code-hash');
+      verificationCodeRepositoryMock.create.mockResolvedValue(undefined);
 
-      verificationCodeRepository.create.mockResolvedValue(undefined);
+      emailSenderMock.sendEmail.mockResolvedValue(undefined);
 
-      emailSender.sendEmail.mockResolvedValue(undefined);
+      dateHandlerMock.addMinutes.mockReturnValue(
+        new Date('2026-08-25T20:10:00.000Z'),
+      );
+
+      jest.spyOn(VerificationCode, 'generate').mockReturnValue('123456');
+
+      verificationCodeLookupMock.generateLookup.mockReturnValue(
+        'test-code-lookup',
+      );
+
+      idGeneratorMock.generate.mockReturnValue('test-code-id');
 
       // Act
-      const result = await useCase.run(dto);
+      const result = await useCase.run(loginCommand);
 
       // Assert
-      expect(result).toBe(account.accountId);
+      expect(result).toBeUndefined();
 
-      expect(generateVerificationCodeMock).toHaveBeenCalledTimes(1);
-
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        dto.password,
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
+        loginCommand.password,
         account.passwordHash,
       );
 
-      expect(bcryptHashMock).toHaveBeenCalledWith('123456', 10);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(VerificationCode.generate).toHaveBeenCalledTimes(1);
 
-      expect(verificationCodeRepository.create).toHaveBeenCalledWith(
+      expect(encryptorMock.hash).toHaveBeenCalledWith('123456', 10);
+
+      expect(verificationCodeLookupMock.generateLookup).toHaveBeenCalledWith(
+        '123456',
+      );
+
+      expect(verificationCodeRepositoryMock.create).toHaveBeenCalledWith(
         expect.any(VerificationCode),
       );
 
-      expect(emailSender.sendEmail).toHaveBeenCalledWith(
-        account.email,
+      expect(emailSenderMock.sendEmail).toHaveBeenCalledWith(
+        loginCommand.email,
         'Código de verificación de CallOrder',
         expect.stringContaining('123456'),
       );
 
-      expect(emailSender.sendEmail).toHaveBeenCalledWith(
-        account.email,
+      expect(emailSenderMock.sendEmail).toHaveBeenCalledWith(
+        loginCommand.email,
         'Código de verificación de CallOrder',
         expect.stringContaining('10 minutos'),
       );

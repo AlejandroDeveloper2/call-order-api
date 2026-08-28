@@ -271,8 +271,8 @@ export class PostgresAccountRepository implements AccountRepositoryPort {
 
   async block(
     accountId: string,
-    lockedUntil: Date,
     failedAttempts: number,
+    lockedUntil?: Date,
   ): Promise<number> {
     try {
       const result = await this.accountRepository.update(
