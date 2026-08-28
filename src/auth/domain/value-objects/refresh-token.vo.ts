@@ -19,10 +19,6 @@ export class RefreshToken {
     return new RefreshToken(normalized);
   }
 
-  getValue(): string {
-    return this.value;
-  }
-
   equals(other: RefreshToken): boolean {
     return this.value === other.value;
   }

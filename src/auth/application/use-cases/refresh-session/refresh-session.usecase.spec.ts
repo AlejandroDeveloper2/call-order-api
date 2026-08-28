@@ -1,236 +1,228 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-  SESSION_REPOSITORY,
+  AccessTokenGeneratorPort,
+  AccessTokenVerifierPort,
+  DateHandlerPort,
+  RefreshTokenGeneratorPort,
   SessionRepositoryPort,
+  TokenHasherPort,
 } from '../../../domain/ports';
 
-/** Errores */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+/** Modelos de lectura */
+import { SessionToUpdateModel } from '../../../domain/models';
 
 /** Caso de uso */
 import { RefreshSessionUseCase } from './refresh-session.usecase';
 
-/** Utilidades */
-import {
-  buildAccount,
-  buildSession,
-} from '../../../../shared/application/utils/domain-class-contructor';
+/** Excepciones de aplicación */
+import { InvalidSessionException } from '../../exceptions';
 
-jest.mock('bcrypt', () => ({
-  compare: jest.fn(),
-  compareSync: jest.fn(),
-  hash: jest.fn(),
-}));
+type SessionRepositoryMock = Pick<
+  SessionRepositoryPort,
+  'findActiveToUpdate' | 'refresh'
+>;
+type TokenHasherMock = Pick<TokenHasherPort, 'compare' | 'hash'>;
+type AccessTokenGeneratorMock = Pick<AccessTokenGeneratorPort, 'generate'>;
+type AccessTokenVerifierMock = Pick<AccessTokenVerifierPort, 'verify'>;
+type RefreshTokenGeneratorMock = Pick<RefreshTokenGeneratorPort, 'generate'>;
+type DateHandlerMock = Pick<DateHandlerPort, 'addDays'>;
 
 describe('RefreshSessionUseCase', () => {
   let useCase: RefreshSessionUseCase;
+  let sessionRepositoryMock: jest.Mocked<SessionRepositoryMock>;
+  let tokenHasherMock: jest.Mocked<TokenHasherMock>;
+  let accessTokenGeneratorMock: jest.Mocked<AccessTokenGeneratorMock>;
+  let accessTokenVerifierMock: jest.Mocked<AccessTokenVerifierMock>;
+  let refreshTokenGeneratorMock: jest.Mocked<RefreshTokenGeneratorMock>;
+  let dateHandlerMock: jest.Mocked<DateHandlerMock>;
 
-  const jwtService = {
-    verify: jest.fn(),
-    sign: jest.fn(),
-  } satisfies Pick<JwtService, 'verify' | 'sign'>;
+  beforeEach(() => {
+    sessionRepositoryMock = {
+      findActiveToUpdate: jest.fn(),
+      refresh: jest.fn(),
+    };
 
-  const sessionRepository = {
-    update: jest.fn(),
-  } satisfies Pick<SessionRepositoryPort, 'update'>;
+    tokenHasherMock = {
+      hash: jest.fn(),
+      compare: jest.fn(),
+    };
 
-  const accountRepository = {
-    findById: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'findById'>;
+    accessTokenGeneratorMock = {
+      generate: jest.fn(),
+    };
 
-  const bcryptCompareSyncMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => boolean
-  >(bcrypt.compareSync);
-  const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => Promise<boolean>
-  >(bcrypt.compare);
-  const bcryptHashMock = jest.mocked<
-    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
-  >(bcrypt.hash);
+    accessTokenVerifierMock = {
+      verify: jest.fn(),
+    };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RefreshSessionUseCase,
-        {
-          provide: JwtService,
-          useValue: jwtService,
-        },
-        {
-          provide: SESSION_REPOSITORY,
-          useValue: sessionRepository,
-        },
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: accountRepository,
-        },
-      ],
-    }).compile();
+    refreshTokenGeneratorMock = {
+      generate: jest.fn(),
+    };
 
-    useCase = module.get<RefreshSessionUseCase>(RefreshSessionUseCase);
+    dateHandlerMock = {
+      addDays: jest.fn(),
+    };
+
+    useCase = new RefreshSessionUseCase(
+      sessionRepositoryMock as unknown as SessionRepositoryPort,
+      tokenHasherMock,
+      accessTokenGeneratorMock,
+      accessTokenVerifierMock,
+      refreshTokenGeneratorMock,
+      dateHandlerMock as unknown as DateHandlerPort,
+    );
 
     jest.clearAllMocks();
   });
 
+  const accountId = 'test-account-id';
+  const session: SessionToUpdateModel = {
+    sessionId: 'test-session-id',
+    tokenHash: 'stored-token-hash',
+    refreshTokenHash: 'stored-refresh-token-hash',
+  };
+  const oldToken =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30';
+  const oldRefreshToken =
+    '3de3bc8b981cfecb3116b1a643163886e011fbfd877aba391298b1f3a56c012f8b3bcfb55643a08372ddcd3d1ab0c939e83fc236360ec289f9444b6c0cc9a7d0';
+
   describe('run', () => {
-    it('debe lanzar AppError cuando la cuenta no existe', async () => {
+    it('debe lanzar InvalidSessionException cuando la ID de cuenta no corresponde a ninguna sesión registrada', async () => {
       // Arrange
-      const accountId = 'wrong-account-id';
-      const oldToken = 'test-old-wrong-token';
-      const refreshToken = 'test-refresh-token';
+      const wrongAccountId = 'wrong-account-id';
 
-      accountRepository.findById.mockResolvedValue(null);
+      sessionRepositoryMock.findActiveToUpdate.mockResolvedValue(null);
 
       // Act
-      const result = useCase.run(accountId, oldToken, refreshToken);
+      const result = useCase.run(wrongAccountId, oldToken, oldRefreshToken);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountNotFound,
-        httpCode: 404,
-      });
+      await expect(result).rejects.toThrow(InvalidSessionException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
-      expect(sessionRepository.update).not.toHaveBeenCalled();
-      expect(jwtService.verify).not.toHaveBeenCalled();
-      expect(jwtService.sign).not.toHaveBeenCalled();
-      expect(bcryptCompareSyncMock).not.toHaveBeenCalled();
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-      expect(bcryptHashMock).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.findActiveToUpdate).toHaveBeenCalledWith(
+        wrongAccountId,
+      );
+
+      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
+      expect(accessTokenVerifierMock.verify).not.toHaveBeenCalled();
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.hash).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.refresh).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar AppError cuando la sesión no es válida', async () => {
+    it('debe lanzar InvalidSessionException cuando el access token no es válido', async () => {
       // Arrange
-      const accountId = 'test-account-id';
-      const oldToken = 'test-old-wrong-token';
-      const refreshToken = 'test-refresh-token';
+      const oldWrongToken = oldToken;
 
-      const session = buildSession();
-      const account = buildAccount({ sessions: [session] });
+      sessionRepositoryMock.findActiveToUpdate.mockResolvedValue(session);
 
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareSyncMock.mockReturnValue(false);
+      tokenHasherMock.compare.mockReturnValue(false);
 
       // Act
-      const result = useCase.run(accountId, oldToken, refreshToken);
+      const result = useCase.run(accountId, oldWrongToken, oldRefreshToken);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidSession,
-        httpCode: 401,
-      });
+      await expect(result).rejects.toThrow(InvalidSessionException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      expect(sessionRepositoryMock.findActiveToUpdate).toHaveBeenCalledWith(
+        accountId,
+      );
+      expect(tokenHasherMock.compare).toHaveBeenCalledTimes(1);
 
-      expect(sessionRepository.update).not.toHaveBeenCalled();
-
-      expect(jwtService.verify).not.toHaveBeenCalled();
-
-      expect(jwtService.sign).not.toHaveBeenCalled();
-
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-
-      expect(bcryptHashMock).not.toHaveBeenCalled();
+      expect(accessTokenVerifierMock.verify).not.toHaveBeenCalled();
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.hash).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.refresh).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar AppError cuando el refresh token no es válido', async () => {
+    it('debe lanzar InvalidSessionException cuando el refresh token no es válido', async () => {
       // Arrange
-      const accountId = 'test-account-id';
-      const oldToken = 'test-old-token';
-      const refreshToken = 'test-wrong-refresh-token';
+      const oldWrongRefreshToken = oldRefreshToken;
 
-      const session = buildSession();
-      const account = buildAccount({ sessions: [session] });
+      sessionRepositoryMock.findActiveToUpdate.mockResolvedValue(session);
 
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareSyncMock.mockReturnValue(true);
-
-      bcryptCompareMock.mockResolvedValue(false);
+      tokenHasherMock.compare
+        .mockReturnValueOnce(true)
+        .mockReturnValueOnce(false);
 
       // Act
-      const result = useCase.run(accountId, oldToken, refreshToken);
+      const result = useCase.run(accountId, oldToken, oldWrongRefreshToken);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidSession,
-        httpCode: 401,
-      });
+      await expect(result).rejects.toThrow(InvalidSessionException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      expect(sessionRepositoryMock.findActiveToUpdate).toHaveBeenCalledWith(
+        accountId,
+      );
+      expect(tokenHasherMock.compare).toHaveBeenCalledTimes(2);
 
-      expect(sessionRepository.update).not.toHaveBeenCalled();
-
-      expect(jwtService.verify).not.toHaveBeenCalled();
-
-      expect(jwtService.sign).not.toHaveBeenCalled();
-
-      expect(bcryptHashMock).not.toHaveBeenCalled();
+      expect(accessTokenVerifierMock.verify).not.toHaveBeenCalled();
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.hash).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.refresh).not.toHaveBeenCalled();
     });
 
     it('debe retornar el nuevo token y refresh token cuando la sesión es válida', async () => {
       // Arrange
-      const accountId = 'test-account-id';
-      const oldToken = 'test-old-token';
-      const refreshToken = 'test-old-refresh-token';
-      const jwtPayload = {
-        accountId: 'test-account-id',
+      const accessTokenPayload = {
+        accountId,
         roleId: 'test-role-id',
         profileId: 'test-profile-id',
       };
+      const newToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30';
 
-      const session = buildSession();
-      const account = buildAccount({ sessions: [session] });
+      const newRefreshToken =
+        '05e482780e544691306b834c4f0a9d52be31d22b0b7fcbbabdce6117300f9d1e8b3b8b6a0fa189714631dd0528bce4953b7f97cabeb0009c18f6bebfd6dac9ad';
 
-      accountRepository.findById.mockResolvedValue(account);
+      const expiresAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
 
-      bcryptCompareSyncMock.mockReturnValue(true);
-
-      bcryptCompareMock.mockResolvedValue(true);
-
-      jwtService.sign.mockReturnValue('new-token');
-
-      jwtService.verify.mockReturnValue(jwtPayload);
-
-      bcryptHashMock
-        .mockResolvedValueOnce('new-token-hash')
-        .mockResolvedValueOnce('new-refresh-token-hash');
+      sessionRepositoryMock.findActiveToUpdate.mockResolvedValue(session);
+      tokenHasherMock.compare.mockReturnValue(true);
+      accessTokenGeneratorMock.generate.mockResolvedValue(newToken);
+      refreshTokenGeneratorMock.generate.mockReturnValue(newRefreshToken);
+      accessTokenVerifierMock.verify.mockResolvedValue(accessTokenPayload);
+      tokenHasherMock.hash
+        .mockReturnValueOnce('new-token-hash')
+        .mockReturnValueOnce('new-refresh-token-hash');
+      dateHandlerMock.addDays.mockReturnValue(expiresAt);
 
       // Act
-      const result = await useCase.run(accountId, oldToken, refreshToken);
+      const result = await useCase.run(accountId, oldToken, oldRefreshToken);
 
       // Assert
-      expect(result.token).toBe('new-token');
+      expect(result.token).toBe(newToken);
       expect(result.refreshToken).toEqual(expect.any(String));
       expect(result.refreshToken).toHaveLength(128);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      expect(sessionRepositoryMock.findActiveToUpdate).toHaveBeenCalledWith(
+        accountId,
+      );
 
-      expect(jwtService.verify).toHaveBeenCalledTimes(1);
+      expect(tokenHasherMock.compare).toHaveBeenCalledTimes(2);
 
-      expect(jwtService.verify).toHaveBeenCalledWith(oldToken, {
-        ignoreExpiration: true,
-      });
+      expect(accessTokenVerifierMock.verify).toHaveBeenCalledTimes(1);
+      expect(accessTokenVerifierMock.verify).toHaveBeenCalledWith(oldToken);
 
-      expect(jwtService.sign).toHaveBeenCalledTimes(1);
+      expect(accessTokenGeneratorMock.generate).toHaveBeenCalledTimes(1);
+      expect(accessTokenGeneratorMock.generate).toHaveBeenCalledWith(
+        accessTokenPayload,
+      );
 
-      expect(jwtService.sign).toHaveBeenCalledWith(jwtPayload);
+      expect(refreshTokenGeneratorMock.generate).toHaveBeenCalledTimes(1);
 
-      expect(bcryptHashMock).toHaveBeenCalledTimes(2);
-
-      expect(sessionRepository.update).toHaveBeenCalledWith('test-session-id', {
-        tokenHash: 'new-token-hash',
-        refreshTokenHash: expect.any(String) as string,
-        lastActivityAt: expect.any(Date) as Date,
-        expiresAt: expect.any(Date) as Date,
-      });
+      expect(sessionRepositoryMock.refresh).toHaveBeenCalledWith(
+        session.sessionId,
+        {
+          tokenHash: expect.any(String) as string,
+          refreshTokenHash: expect.any(String) as string,
+          lastActivityAt: expect.any(Date) as Date,
+          expiresAt,
+        },
+      );
     });
   });
 });

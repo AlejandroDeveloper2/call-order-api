@@ -27,26 +27,29 @@ export class RefreshSessionUseCase {
   async run(
     accountId: string,
     oldToken: string,
-    refreshToken: string,
+    oldRefreshToken: string,
   ): Promise<{ token: string; refreshToken: string }> {
+    /** Validar los token con los value Object respectivos */
+    const token = JwtAccessToken.create(oldToken);
+    const refreshToken = RefreshToken.create(oldRefreshToken);
+
     /**  Obtener las sesiones activas por ID de cuenta proporcionado */
     const session = await this.sessionRepository.findActiveToUpdate(accountId);
-
-    /** Validar los token con los value Object respectivos */
-    const tokenValue = JwtAccessToken.create(oldToken).toString();
-    const refreshTokenValue = RefreshToken.create(refreshToken).toString();
 
     if (!session) throw new InvalidSessionException('Sesión invalida');
 
     /** Comparar el hash del token para filtrar la sesión actual */
-    const isValid = this.tokenHasher.compare(tokenValue, session.tokenHash);
+    const isValid = this.tokenHasher.compare(
+      token.toString(),
+      session.tokenHash,
+    );
 
     /** Validar si la sesión es valida */
     if (!isValid) throw new InvalidSessionException('Sesión invalida');
 
     /** Validar si el refresh token es valido */
     const isValidRefreshToken = this.tokenHasher.compare(
-      refreshTokenValue,
+      refreshToken.toString(),
       session.refreshTokenHash,
     );
 
@@ -54,29 +57,26 @@ export class RefreshSessionUseCase {
       throw new InvalidSessionException('Refresh Token invalido');
 
     /** Obtener el payload del token para crear uno nuevo */
-    const oldPayload = await this.accessTokenVerifier.verify(tokenValue);
+    const oldPayload = await this.accessTokenVerifier.verify(token.toString());
 
     /** Generar nuevo token preservando el payload original */
-    const newToken: string = await this.accessTokenGenerator.generate({
+    const generatedToken: string = await this.accessTokenGenerator.generate({
       accountId: oldPayload.accountId,
       roleId: oldPayload.roleId,
       profileId: oldPayload.profileId,
     });
-
-    /** Validar con el value object */
-    const newTokenValue = JwtAccessToken.create(newToken).toString();
-
     /** Generar nuevo refresh token */
-    const newRefreshToken: string = this.refreshTokenGenerator.generate();
+    const generatedRefreshToken: string = this.refreshTokenGenerator.generate();
 
-    /** Validar con el value object */
-    const newRefreshTokenValue =
-      RefreshToken.create(newRefreshToken).toString();
+    /** Validar con los value object respectivos */
+    const newToken = JwtAccessToken.create(generatedToken);
+    const newRefreshToken = RefreshToken.create(generatedRefreshToken);
 
     /** Encriptar el nuevo token y refresh token */
-    const newTokenHash: string = this.tokenHasher.hash(newTokenValue);
-    const newRefreshTokenHash: string =
-      this.tokenHasher.hash(newRefreshTokenValue);
+    const newTokenHash: string = this.tokenHasher.hash(newToken.toString());
+    const newRefreshTokenHash: string = this.tokenHasher.hash(
+      newRefreshToken.toString(),
+    );
 
     /** Actualizar la sesión con el nuevo token, refresh token , última actividad y tiempo de expiración */
     await this.sessionRepository.refresh(session.sessionId, {
@@ -87,8 +87,8 @@ export class RefreshSessionUseCase {
     });
 
     return {
-      token: newTokenValue,
-      refreshToken: newRefreshTokenValue,
+      token: newToken.toString(),
+      refreshToken: newRefreshToken.toString(),
     };
   }
 }

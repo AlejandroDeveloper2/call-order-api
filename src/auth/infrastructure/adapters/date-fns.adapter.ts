@@ -1,7 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import { addDays, addHours, addMinutes, isAfter, isBefore } from 'date-fns';
 
 import { DateHandlerPort } from '../../domain/ports';
 
+@Injectable()
 export class DateFnsAdapter implements DateHandlerPort {
   addDays(targetDate: Date, days: number): Date {
     return addDays(targetDate, days);
