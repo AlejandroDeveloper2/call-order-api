@@ -12,7 +12,6 @@ import { AccountLoginModel } from '../../../domain/models';
 /** Puertos */
 import {
   AccountRepositoryPort,
-  DateHandlerPort,
   EncryptorPort,
   VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
@@ -20,6 +19,7 @@ import {
 import {
   EmailSenderPort,
   IdGeneratorPort,
+  DateHandlerPort,
 } from '../../../../shared/domain/ports';
 
 /** Commands */

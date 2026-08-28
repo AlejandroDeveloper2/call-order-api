@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import {
   CloudinaryAdpater,
+  DateFnsAdapter,
   NodeMailerAdapter,
   TypeOrmTransactionManagerAdapter,
   UUIDAdapter,
@@ -11,6 +12,7 @@ import {
 import { CloudinaryUploadInterceptor } from './infrastructure/interceptors';
 
 import {
+  DATE_HANDLER,
   EMAIL_SENDER_KEY,
   FILE_UPLOADER,
   ID_GENERATOR_KEY,
@@ -34,6 +36,10 @@ import {
       provide: ID_GENERATOR_KEY,
       useClass: UUIDAdapter,
     },
+    {
+      provide: DATE_HANDLER,
+      useClass: DateFnsAdapter,
+    },
   ],
   exports: [
     EMAIL_SENDER_KEY,
@@ -41,6 +47,7 @@ import {
     FILE_UPLOADER,
     CloudinaryUploadInterceptor,
     ID_GENERATOR_KEY,
+    DATE_HANDLER,
   ],
 })
 export class SharedModule {}

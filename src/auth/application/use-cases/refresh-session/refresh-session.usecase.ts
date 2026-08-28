@@ -2,11 +2,11 @@
 import {
   AccessTokenGeneratorPort,
   AccessTokenVerifierPort,
-  DateHandlerPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
   TokenHasherPort,
 } from '../../../domain/ports';
+import { DateHandlerPort } from '../../../../shared/domain/ports';
 
 /** Errores */
 import { InvalidSessionException } from '../../exceptions';

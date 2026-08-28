@@ -8,4 +8,3 @@ export * from './adapters/access-token-verifier.port';
 export * from './adapters/refresh-token-generator.port';
 export * from './adapters/verification-code-look-up.port';
 export * from './adapters/token-hasher.port';
-export * from './adapters/date-handler.port';

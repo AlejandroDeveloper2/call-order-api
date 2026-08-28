@@ -3,3 +3,4 @@ export * from './file-uploader.port';
 export * from './transaction-manager.port';
 export * from './transaction-context.port';
 export * from './id-generator.port';
+export * from './date-handler.port';

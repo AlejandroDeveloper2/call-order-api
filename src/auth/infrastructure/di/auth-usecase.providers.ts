@@ -24,8 +24,6 @@ import {
   AccessTokenVerifierPort,
   ACCOUNT_REPOSITORY,
   AccountRepositoryPort,
-  DATE_HANDLER,
-  DateHandlerPort,
   ENCRYPTOR,
   EncryptorPort,
   REFRESH_TOKEN_GENERATOR,
@@ -47,6 +45,8 @@ import {
   IdGeneratorPort,
   TRANSACTION_MANAGER,
   TransactionManagerPort,
+  DATE_HANDLER,
+  DateHandlerPort,
 } from '../../../shared/domain/ports';
 
 import {

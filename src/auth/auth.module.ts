@@ -4,9 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
-/** Puertos */
-import { DATE_HANDLER } from './domain/ports';
-
 /** Controladores */
 import { AuthController } from './infrastructure/controllers/auth.controller';
 
@@ -34,9 +31,6 @@ import {
   AUTH_USE_CASE_PROVIDERS,
 } from './infrastructure/di';
 
-/** Adaptadores */
-import { DateFnsAdapter } from './infrastructure/adapters';
-
 @Module({
   imports: [
     SharedModule,
@@ -63,10 +57,6 @@ import { DateFnsAdapter } from './infrastructure/adapters';
     ...AUTH_USE_CASE_PROVIDERS,
     ...AUTH_REPOSITORY_PROVIDERS,
     ...AUTH_SECURITY_PROVIDERS,
-    {
-      provide: DATE_HANDLER,
-      useClass: DateFnsAdapter,
-    },
   ],
   exports: [PermissionsGuard],
 })
