@@ -8,6 +8,12 @@ import {
 } from '../../../domain/ports';
 import { DateHandlerPort } from '../../../../shared/domain/ports';
 
+/** Excepciones de dominio */
+import {
+  InvalidRefreshTokenException,
+  InvalidTokenException,
+} from '../../../domain/exceptions';
+
 /** Modelos de lectura */
 import { SessionToUpdateModel } from '../../../domain/models';
 
@@ -87,6 +93,44 @@ describe('RefreshSessionUseCase', () => {
     '3de3bc8b981cfecb3116b1a643163886e011fbfd877aba391298b1f3a56c012f8b3bcfb55643a08372ddcd3d1ab0c939e83fc236360ec289f9444b6c0cc9a7d0';
 
   describe('run', () => {
+    it('deberia lanzar InvalidTokenException si el token no tiene un formato invalido', async () => {
+      // Arrange
+      const invalidToken = 'token-1';
+
+      // Act
+      const result = useCase.run(accountId, invalidToken, oldRefreshToken);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidTokenException);
+
+      expect(sessionRepositoryMock.findActiveToUpdate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
+      expect(accessTokenVerifierMock.verify).not.toHaveBeenCalled();
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.hash).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.refresh).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar InvalidRefreshTokenException si el refresh token no tiene un formato invalido', async () => {
+      // Arrange
+      const invalidRefreshToken = 'refresh-token-1';
+
+      // Act
+      const result = useCase.run(accountId, oldToken, invalidRefreshToken);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidRefreshTokenException);
+
+      expect(sessionRepositoryMock.findActiveToUpdate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
+      expect(accessTokenVerifierMock.verify).not.toHaveBeenCalled();
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+      expect(tokenHasherMock.hash).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.refresh).not.toHaveBeenCalled();
+    });
+
     it('debe lanzar InvalidSessionException cuando la ID de cuenta no corresponde a ninguna sesión registrada', async () => {
       // Arrange
       const wrongAccountId = 'wrong-account-id';
