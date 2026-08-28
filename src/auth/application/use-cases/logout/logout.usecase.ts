@@ -14,17 +14,20 @@ export class LogoutUseCase {
   ) {}
 
   async run(accountId: string, token: string): Promise<void> {
+    /** Validar el token con el value Object */
+    const accessToken = JwtAccessToken.create(token);
+
     /** Obtener la sesión activa por ID de cuenta proporcionado */
     const session =
       await this.sessionRepository.findActiveForValidation(accountId);
 
-    /** Validar el token con el value Object */
-    const tokenValue = JwtAccessToken.create(token).toString();
-
     if (!session) throw new InvalidSessionException('Sesión invalida');
 
     /** Comparar el hash del token para filtrar la sesión actual */
-    const isValid = this.tokenHasher.compare(tokenValue, session.tokenHash);
+    const isValid = this.tokenHasher.compare(
+      accessToken.toString(),
+      session.tokenHash,
+    );
 
     /** Validar si la sesión es valida */
     if (!isValid) throw new InvalidSessionException('Sesión invalida');

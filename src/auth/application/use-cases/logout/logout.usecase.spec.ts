@@ -1,138 +1,144 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
+/** Modelos de lectura */
+import { SessionValidationModel } from '../../../domain/models';
+
+/** Excepciones de dominio */
+import { InvalidTokenException } from '../../../domain/exceptions';
 
 /** Puertos */
-import {
-  SessionRepositoryPort,
-  SESSION_REPOSITORY,
-  AccountRepositoryPort,
-  ACCOUNT_REPOSITORY,
-} from '../../../domain/ports';
+import { SessionRepositoryPort, TokenHasherPort } from '../../../domain/ports';
 
-/** Errores */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+/** Excepciones de aplicación */
+import { InvalidSessionException } from '../../exceptions';
 
 /** Casos de uso */
 import { LogoutUseCase } from './logout.usecase';
 
-/** Utilidades */
-import {
-  buildAccount,
-  buildSession,
-} from '../../../../shared/application/utils/domain-class-contructor';
-
-jest.mock('bcrypt', () => ({
-  compareSync: jest.fn(),
-}));
+type SessionRopositoryMock = Pick<
+  SessionRepositoryPort,
+  'revoke' | 'findActiveForValidation'
+>;
+type TokenHasherMock = Pick<TokenHasherPort, 'compare'>;
 
 describe('LogoutUseCase', () => {
   let useCase: LogoutUseCase;
+  let sessionRepositoryMock: jest.Mocked<SessionRopositoryMock>;
+  let tokenHasherMock: jest.Mocked<TokenHasherMock>;
 
-  const mockAccountRepository = {
-    findById: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'findById'>;
+  const accountId = 'test-account-id';
+  const token =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30';
 
-  const mockSessionRepository = {
-    update: jest.fn(),
-  } satisfies Pick<SessionRepositoryPort, 'update'>;
+  beforeEach(() => {
+    sessionRepositoryMock = {
+      findActiveForValidation: jest.fn(),
+      revoke: jest.fn(),
+    };
+    tokenHasherMock = {
+      compare: jest.fn(),
+    };
 
-  const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => boolean
-  >(bcrypt.compareSync);
+    useCase = new LogoutUseCase(
+      sessionRepositoryMock as unknown as SessionRepositoryPort,
+      tokenHasherMock as unknown as TokenHasherPort,
+    );
 
-  beforeEach(async () => {
     jest.clearAllMocks();
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LogoutUseCase,
-        {
-          provide: SESSION_REPOSITORY,
-          useValue: mockSessionRepository,
-        },
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: mockAccountRepository,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get(LogoutUseCase);
   });
 
   describe('run()', () => {
-    it('debe lanzar error cuando no se encuentra ninguna cuenta asociada al ID Proporcionado', async () => {
+    it('debe lanzar InvalidTokenException si el token proporcionado no tiene un formato valido', async () => {
       // Arrange
-      mockAccountRepository.findById.mockResolvedValue(null);
+      const invalidToken = 'token-1';
 
       // Act
-      const result = useCase.run('wrong-account-id', 'test-token');
+      const result = useCase.run(accountId, invalidToken);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountNotFound,
-        httpCode: 404,
-      });
-      expect(mockAccountRepository.findById).toHaveBeenCalledWith(
-        'wrong-account-id',
-      );
-      expect(mockSessionRepository.update).not.toHaveBeenCalled();
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
+      await expect(result).rejects.toThrow(InvalidTokenException);
+
+      expect(
+        sessionRepositoryMock.findActiveForValidation,
+      ).not.toHaveBeenCalled();
+      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
+      expect(sessionRepositoryMock.revoke).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar error cuando el token no es valido', async () => {
+    it('deberia lanzar InvalidSessionException cuando no se encuentra ninguna sesión asociada al ID Proporcionado', async () => {
       // Arrange
-      const session = buildSession();
-      const account = buildAccount({ sessions: [session] });
+      const wrongAccountId = 'wrong-account-id';
 
-      mockAccountRepository.findById.mockResolvedValue(account);
+      sessionRepositoryMock.findActiveForValidation.mockResolvedValue(null);
 
-      bcryptCompareMock.mockReturnValue(false);
-
-      // Act
-      const result = useCase.run('test-account-id', 'wrong-token');
+      // Acts
+      const result = useCase.run(wrongAccountId, token);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidSession,
-        httpCode: 401,
-      });
-      expect(mockAccountRepository.findById).toHaveBeenCalledWith(
-        'test-account-id',
-      );
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        'wrong-token',
-        'test-token-hash',
-      );
-      expect(mockSessionRepository.update).not.toHaveBeenCalled();
+      await expect(result).rejects.toThrow(InvalidSessionException);
+
+      expect(
+        sessionRepositoryMock.findActiveForValidation,
+      ).toHaveBeenCalledWith(wrongAccountId);
+
+      expect(sessionRepositoryMock.revoke).not.toHaveBeenCalled();
+      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
     });
 
-    it('debe revocar la sesion actual cuando el token es valido', async () => {
+    it('deberia lanzar InvalidSessionException cuando el token no es valido', async () => {
       // Arrange
-      const session = buildSession();
-      const account = buildAccount({ sessions: [session] });
+      const session: SessionValidationModel = {
+        sessionId: 'test-session-id',
+        tokenHash: 'stored-token-hash',
+      };
 
-      mockAccountRepository.findById.mockResolvedValue(account);
+      sessionRepositoryMock.findActiveForValidation.mockResolvedValue(session);
 
-      bcryptCompareMock.mockReturnValue(true);
+      tokenHasherMock.compare.mockReturnValue(false);
 
       // Act
-      const result = useCase.run('test-account-id', 'test-token');
+      const result = useCase.run(accountId, token);
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidSessionException);
+
+      expect(
+        sessionRepositoryMock.findActiveForValidation,
+      ).toHaveBeenCalledWith(accountId);
+
+      expect(tokenHasherMock.compare).toHaveBeenCalledWith(
+        token,
+        session.tokenHash,
+      );
+
+      expect(sessionRepositoryMock.revoke).not.toHaveBeenCalled();
+    });
+
+    it('deberia revocar la sesion actual cuando el token es valido', async () => {
+      // Arrange
+      const session: SessionValidationModel = {
+        sessionId: 'test-session-id',
+        tokenHash: 'stored-token-hash',
+      };
+
+      sessionRepositoryMock.findActiveForValidation.mockResolvedValue(session);
+
+      tokenHasherMock.compare.mockReturnValue(true);
+
+      // Act
+      const result = useCase.run(accountId, token);
 
       // Assert
       await expect(result).resolves.toBeUndefined();
-      expect(mockAccountRepository.findById).toHaveBeenCalledWith(
-        'test-account-id',
+
+      expect(
+        sessionRepositoryMock.findActiveForValidation,
+      ).toHaveBeenCalledWith(accountId);
+
+      expect(sessionRepositoryMock.revoke).toHaveBeenCalledWith(
+        session.sessionId,
       );
-      expect(mockSessionRepository.update).toHaveBeenCalledWith(
-        'test-session-id',
-        {
-          revokedAt: expect.any(Date) as Date,
-        },
-      );
-      expect(bcryptCompareMock).toHaveBeenCalledWith(
-        'test-token',
-        'test-token-hash',
+      expect(tokenHasherMock.compare).toHaveBeenCalledWith(
+        token,
+        session.tokenHash,
       );
     });
   });
