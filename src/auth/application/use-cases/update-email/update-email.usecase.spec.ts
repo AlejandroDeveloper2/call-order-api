@@ -1,67 +1,69 @@
-import { Test, TestingModule } from '@nestjs/testing';
-
 /** Puertos */
-import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-} from '../../../domain/ports';
+import { AccountRepositoryPort } from '../../../domain/ports';
 
-/** Excepciones */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
-
-/** Dtos */
-import { UpdateEmailDto } from '../../../infrastructure/dto';
+/** Excepción de dominio */
+import { InvalidEmailException } from '../../../domain/exceptions';
 
 /** Casos de uso */
 import { UpdateEmailUseCase } from './update-email.usecase';
 
+/** Commands */
+import { UpdateEmailCommand } from '../../commands';
+
+/** Excepción de aplicación */
+import { AccountNotFoundException } from '../../exceptions';
+
+type AccountRepositoryMock = Pick<AccountRepositoryPort, 'updateEmail'>;
+
 describe('UpdateEmailUseCase', () => {
   let useCase: UpdateEmailUseCase;
+  let accountRepositoryMock: jest.Mocked<AccountRepositoryMock>;
 
-  const accountRepository = {
-    update: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'update'>;
-
-  const updateEmailDto: UpdateEmailDto = {
-    updatedEmail: 'nuevo_correo@gmail.com',
+  const updateEmailCommand: UpdateEmailCommand = {
+    updatedEmail: 'tom.doe@gmail.com',
   };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UpdateEmailUseCase,
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: accountRepository,
-        },
-      ],
-    }).compile();
+  beforeEach(() => {
+    accountRepositoryMock = {
+      updateEmail: jest.fn(),
+    };
 
-    useCase = module.get<UpdateEmailUseCase>(UpdateEmailUseCase);
+    useCase = new UpdateEmailUseCase(
+      accountRepositoryMock as unknown as AccountRepositoryPort,
+    );
+
     jest.clearAllMocks();
   });
 
   describe('(run)', () => {
-    it('deberia lanzar un AppError cuando el accountId no corresponda a ninguna cuenta registrada', async () => {
+    it('deberia lanzar InvalidEmailException si el correo no es valido', async () => {
+      // Arrange
+      const accountId = 'test-account-id';
+
+      // Act
+      const result = useCase.run(accountId, { updatedEmail: 'tom.doe' });
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidEmailException);
+
+      expect(accountRepositoryMock.updateEmail).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar un AccountNotFoundException cuando el accountId no corresponda a ninguna cuenta registrada', async () => {
       // Arrange
       const accountId = 'wrong-account-id';
 
-      accountRepository.update.mockResolvedValue(0);
+      accountRepositoryMock.updateEmail.mockResolvedValue(0);
 
       // Act
-      const result = useCase.run(accountId, updateEmailDto);
+      const result = useCase.run(accountId, updateEmailCommand);
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountNotFound,
-        httpCode: 404,
-      });
+      await expect(result).rejects.toThrow(AccountNotFoundException);
 
-      expect(accountRepository.update).toHaveBeenCalledWith(
+      expect(accountRepositoryMock.updateEmail).toHaveBeenCalledWith(
         accountId,
-        expect.objectContaining({
-          email: updateEmailDto.updatedEmail,
-        }),
+        updateEmailCommand.updatedEmail,
       );
     });
 
@@ -69,18 +71,16 @@ describe('UpdateEmailUseCase', () => {
       // Arrange
       const accountId = 'test-account-id';
 
-      accountRepository.update.mockResolvedValue(1);
+      accountRepositoryMock.updateEmail.mockResolvedValue(1);
 
       //Act
-      const result = await useCase.run(accountId, updateEmailDto);
+      const result = await useCase.run(accountId, updateEmailCommand);
 
       //Assert
       expect(result).toBeUndefined();
-      expect(accountRepository.update).toHaveBeenCalledWith(
+      expect(accountRepositoryMock.updateEmail).toHaveBeenCalledWith(
         accountId,
-        expect.objectContaining({
-          email: updateEmailDto.updatedEmail,
-        }),
+        updateEmailCommand.updatedEmail,
       );
     });
   });

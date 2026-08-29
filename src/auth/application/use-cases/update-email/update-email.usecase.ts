@@ -17,13 +17,11 @@ export class UpdateEmailUseCase {
     accountId: string,
     updateEmailCommand: UpdateEmailCommand,
   ): Promise<void> {
-    const { updatedEmail } = updateEmailCommand;
-
-    const updatedEmailValue = Email.create(updatedEmail).toString();
+    const updatedEmail = Email.create(updateEmailCommand.updatedEmail);
 
     const affectedRows = await this.accountRepository.updateEmail(
       accountId,
-      updatedEmailValue,
+      updatedEmail.toString(),
     );
 
     if (affectedRows === 0)
