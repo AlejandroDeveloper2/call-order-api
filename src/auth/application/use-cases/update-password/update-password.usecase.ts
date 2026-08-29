@@ -20,11 +20,9 @@ export class UpdatePasswordUseCase {
     accountId: string,
     updatePasswordCommand: UpdatePasswordCommand,
   ): Promise<void> {
-    const { newPassword } = updatePasswordCommand;
+    const newPassword = Password.create(updatePasswordCommand.newPassword);
 
-    const newPasswordValue = Password.create(newPassword).toString();
-
-    const passwordHash = await this.encryptor.hash(newPasswordValue, 14);
+    const passwordHash = await this.encryptor.hash(newPassword.toString(), 14);
 
     const affectedRows = await this.accountRepository.updatePassword(
       accountId,
