@@ -1,224 +1,261 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
-import { addMinutes } from 'date-fns';
-
+/* eslint-disable @typescript-eslint/unbound-method */
 /** Ports */
 import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-  VERIFICATION_CODE_REPOSITORY,
+  EncryptorPort,
+  VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
+
 import {
-  EMAIL_SENDER_KEY,
+  DateHandlerPort,
   EmailSenderPort,
 } from '../../../../shared/domain/ports';
-
-/** Exceptions */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
-
-/** DTO */
-import { ResendCodeDto } from '../../../infrastructure/dto';
 
 /** Use case */
 import { ResendCodeUseCase } from './resend-code.usecase';
 
-/** Utils */
-import { generateVerificationCode } from '../../../domain/utils/generate-validation-code';
+/** Command */
+import { ResendCodeCommand } from '../../commands';
 import {
-  buildAccount,
-  buildVerificationCode,
-} from '../../../../shared/application/utils/domain-class-contructor';
+  CodeNotExpiredYetException,
+  InvalidCodeException,
+} from '../../exceptions';
+import { VerificationCodeValidationModel } from '../../../domain/models';
+import { VerificationCode } from '../../../domain/entities';
 
-jest.mock('bcrypt', () => ({
-  compareSync: jest.fn(),
-  hash: jest.fn(),
-}));
-
-jest.mock('../../../domain/utils/generate-validation-code', () => ({
-  generateVerificationCode: jest.fn(),
-}));
+type VerificationCodeRepositoryMock = Pick<
+  VerificationCodeRepositoryPort,
+  'refresh' | 'findExpiredForForwarding'
+>;
+type EmailSenderMock = Pick<EmailSenderPort, 'sendEmail'>;
+type EncryptorMock = Pick<EncryptorPort, 'compare' | 'hash'>;
+type VerificationCodeLookupMock = Pick<
+  VerificationCodeLookupPort,
+  'generateLookup'
+>;
+type DateHandlerMock = Pick<DateHandlerPort, 'isBefore' | 'addMinutes'>;
 
 describe('ResendCodeUseCase', () => {
   let useCase: ResendCodeUseCase;
+  let verificationCodeRepositoryMock: jest.Mocked<VerificationCodeRepositoryMock>;
+  let emailSenderMock: jest.Mocked<EmailSenderMock>;
+  let encryptorMock: jest.Mocked<EncryptorMock>;
+  let verificationCodeLookupMock: jest.Mocked<VerificationCodeLookupMock>;
+  let dateHandlerMock: jest.Mocked<DateHandlerMock>;
 
-  const accountRepository = {
-    findById: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'findById'>;
-
-  const verificationCodeRepository = {
-    update: jest.fn(),
-  } satisfies Pick<VerificationCodeRepositoryPort, 'update'>;
-
-  const emailSender = {
-    sendEmail: jest.fn(),
-  } satisfies Pick<EmailSenderPort, 'sendEmail'>;
-
-  const bcryptHashMock = jest.mocked<
-    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
-  >(bcrypt.hash);
-
-  const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => boolean
-  >(bcrypt.compareSync);
-
-  const dto: ResendCodeDto = {
-    accountId: 'test-account-id',
-    email: 'test@gmail.com',
+  const resendCodeCommand: ResendCodeCommand = {
+    email: 'jhon.doe@example.com',
     expiredCode: '123456',
   };
 
-  beforeEach(async () => {
+  const codeLookup = 'test-code-lookup';
+
+  const verificationCode: VerificationCodeValidationModel = {
+    verificationCodeId: 'test-verification-code-id',
+    codeHash: 'code-stored-hash',
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    attempts: 0,
+    accountId: 'test-account-id',
+    profile: {
+      profileId: 'test-profile-id',
+      roleId: 'test-role-id',
+    },
+  };
+
+  beforeEach(() => {
+    verificationCodeRepositoryMock = {
+      refresh: jest.fn(),
+      findExpiredForForwarding: jest.fn(),
+    };
+
+    emailSenderMock = {
+      sendEmail: jest.fn(),
+    };
+
+    encryptorMock = {
+      compare: jest.fn(),
+      hash: jest.fn(),
+    };
+
+    verificationCodeLookupMock = {
+      generateLookup: jest.fn().mockReturnValue(codeLookup),
+    };
+
+    dateHandlerMock = {
+      isBefore: jest.fn(),
+      addMinutes: jest.fn(),
+    };
+
+    useCase = new ResendCodeUseCase(
+      verificationCodeRepositoryMock as unknown as VerificationCodeRepositoryPort,
+      emailSenderMock,
+      encryptorMock,
+      verificationCodeLookupMock,
+      dateHandlerMock as unknown as DateHandlerPort,
+    );
+
     jest.clearAllMocks();
+  });
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ResendCodeUseCase,
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: accountRepository,
-        },
-        {
-          provide: VERIFICATION_CODE_REPOSITORY,
-          useValue: verificationCodeRepository,
-        },
-        {
-          provide: EMAIL_SENDER_KEY,
-          useValue: emailSender,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get(ResendCodeUseCase);
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('run()', () => {
-    it('debe lanzar AppError cuando la cuenta no exista', async () => {
+    it('deberia lanzar InvalidCodeException cuando el correo proporcionado no exista', async () => {
       // Arrange
-      accountRepository.findById.mockResolvedValue(null);
+      const wrongEmail = 'peter.doe@example.com';
 
-      // Act
-      const result = useCase.run({ ...dto, accountId: 'wrong-account-id' });
-
-      //Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountNotFound,
-        httpCode: 404,
-      });
-
-      expect(accountRepository.findById).toHaveBeenCalledWith(
-        'wrong-account-id',
+      verificationCodeRepositoryMock.findExpiredForForwarding.mockResolvedValue(
+        null,
       );
 
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
-
-      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
-
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
-    });
-
-    it('debe lanzar AppError cuando el código ingresado no es válido', async () => {
-      // Arrange
-      const account = buildAccount();
-
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareMock.mockReturnValue(false);
-
       // Act
-      const result = useCase.run(dto);
+      const result = useCase.run({
+        ...resendCodeCommand,
+        email: wrongEmail,
+      });
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidCode,
-        httpCode: 401,
-      });
+      await expect(result).rejects.toThrow(InvalidCodeException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
+      expect(
+        verificationCodeRepositoryMock.findExpiredForForwarding,
+      ).toHaveBeenCalledWith(wrongEmail, codeLookup);
 
-      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+      expect(verificationCodeLookupMock.generateLookup).toHaveBeenCalledTimes(
+        1,
+      );
 
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.refresh).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar AppError cuando el código aun no ha expirado', async () => {
+    it('deberia lanzar InvalidCodeException si el código es invalido', async () => {
       // Arrange
-      const verificationCode = buildVerificationCode();
-      const account = buildAccount({ verificationCodes: [verificationCode] });
+      verificationCodeRepositoryMock.findExpiredForForwarding.mockResolvedValue(
+        verificationCode,
+      );
 
-      accountRepository.findById.mockResolvedValue(account);
+      encryptorMock.compare.mockResolvedValue(false);
 
-      bcryptCompareMock.mockReturnValue(true);
+      // Act
+      const result = useCase.run({
+        ...resendCodeCommand,
+        expiredCode: '456123',
+      });
+
+      //Assert
+      await expect(result).rejects.toThrow(InvalidCodeException);
+
+      expect(
+        verificationCodeRepositoryMock.findExpiredForForwarding,
+      ).toHaveBeenCalledWith(resendCodeCommand.email, codeLookup);
+
+      expect(verificationCodeLookupMock.generateLookup).toHaveBeenCalledTimes(
+        1,
+      );
+
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.refresh).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar CodeNotExpiredYetException cuando el código aun no ha expirado', async () => {
+      // Arrange
+      verificationCodeRepositoryMock.findExpiredForForwarding.mockResolvedValue(
+        verificationCode,
+      );
+
+      encryptorMock.compare.mockResolvedValue(true);
+
+      dateHandlerMock.isBefore.mockReturnValue(true);
 
       //Act
-      const result = useCase.run(dto);
+      const result = useCase.run(resendCodeCommand);
 
       // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.codeNotExpiredYet,
-        httpCode: 400,
-      });
+      await expect(result).rejects.toThrow(CodeNotExpiredYetException);
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
+      expect(
+        verificationCodeRepositoryMock.findExpiredForForwarding,
+      ).toHaveBeenCalledWith(resendCodeCommand.email, codeLookup);
 
-      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
+      expect(verificationCodeLookupMock.generateLookup).toHaveBeenCalledTimes(
+        1,
+      );
 
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-
-      expect(emailSender.sendEmail).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.refresh).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('debe generar y actualizar un nuevo código cuando el código ingresado es válido y ya ha expirado', async () => {
+    it('deberia generar y actualizar un nuevo código cuando el código ingresado es válido y ya ha expirado', async () => {
       //Arrange
-      const verificationCode = buildVerificationCode({
-        expiresAt: addMinutes(new Date(), -5),
-      });
-      const account = buildAccount({ verificationCodes: [verificationCode] });
+      const code = {
+        ...verificationCode,
+        expiresAt: new Date(Date.now() - 5 * 60 * 1000),
+      };
+      const newHashedCode = 'new-hashed-code';
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-      accountRepository.findById.mockResolvedValue(account);
+      verificationCodeRepositoryMock.findExpiredForForwarding.mockResolvedValue(
+        code,
+      );
+      encryptorMock.compare.mockResolvedValue(true);
 
-      bcryptCompareMock.mockReturnValue(true);
+      dateHandlerMock.isBefore.mockReturnValue(false);
 
-      bcryptHashMock.mockResolvedValue('new-hashed-code');
+      jest.spyOn(VerificationCode, 'generate').mockReturnValue('789123');
 
-      jest.mocked(generateVerificationCode).mockReturnValue('654321');
+      encryptorMock.hash.mockResolvedValue(newHashedCode);
 
-      verificationCodeRepository.update.mockResolvedValue(1);
-      emailSender.sendEmail.mockResolvedValue(undefined);
+      dateHandlerMock.addMinutes.mockReturnValue(expiresAt);
+
+      verificationCodeRepositoryMock.refresh.mockResolvedValue(1);
+
+      emailSenderMock.sendEmail.mockResolvedValue(undefined);
 
       //Act
-      const result = await useCase.run(dto);
+      const result = await useCase.run(resendCodeCommand);
 
       // Assert
       expect(result).toBeUndefined();
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
+      expect(
+        verificationCodeRepositoryMock.findExpiredForForwarding,
+      ).toHaveBeenCalledWith(resendCodeCommand.email, codeLookup);
 
-      expect(generateVerificationCode).toHaveBeenCalledTimes(1);
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
+        resendCodeCommand.expiredCode,
+        code.codeHash,
+      );
 
-      expect(bcryptHashMock).toHaveBeenCalledWith('654321', 10);
+      expect(VerificationCode.generate).toHaveBeenCalledTimes(1);
+      expect(verificationCodeLookupMock.generateLookup).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(encryptorMock.hash).toHaveBeenCalledWith('789123', 10);
 
-      expect(verificationCodeRepository.update).toHaveBeenCalledTimes(1);
+      expect(verificationCodeRepositoryMock.refresh).toHaveBeenCalledTimes(1);
 
-      expect(verificationCodeRepository.update).toHaveBeenCalledWith(
-        verificationCode.verificationCodeId,
+      expect(verificationCodeRepositoryMock.refresh).toHaveBeenCalledWith(
+        code.verificationCodeId,
         expect.objectContaining({
-          attempts: verificationCode.attempts + 1,
-          codeHash: 'new-hashed-code',
-          expiresAt: expect.any(Date) as Date,
+          attempts: code.attempts + 1,
+          codeHash: newHashedCode,
+          codeLookup,
+          expiresAt,
         }),
       );
 
-      expect(emailSender.sendEmail).toHaveBeenCalledTimes(1);
-
-      expect(emailSender.sendEmail).toHaveBeenCalledWith(
-        dto.email,
+      expect(emailSenderMock.sendEmail).toHaveBeenCalledTimes(1);
+      expect(emailSenderMock.sendEmail).toHaveBeenCalledWith(
+        resendCodeCommand.email,
         'Código de verificación de CallOrder',
-        expect.stringContaining('654321'),
+        expect.stringContaining('789123'),
       );
     });
   });

@@ -3,12 +3,14 @@ import { VerificationCode } from '../../../domain/entities';
 
 /** Puertos */
 import {
-  DateHandlerPort,
   EncryptorPort,
   VerificationCodeLookupPort,
   VerificationCodeRepositoryPort,
 } from '../../../domain/ports';
-import { EmailSenderPort } from '../../../../shared/domain/ports';
+import {
+  EmailSenderPort,
+  DateHandlerPort,
+} from '../../../../shared/domain/ports';
 
 /** Exceptions */
 import {
@@ -32,19 +34,18 @@ export class ResendCodeUseCase {
   ) {}
   /** Logica para enviar código de verificación de nuevo si el anterior expiró */
   async run(resendCodeCommand: ResendCodeCommand): Promise<void> {
-    const { expiredCode, email } = resendCodeCommand;
-
     /** Validar entradas con value objects */
-    const emailValue = Email.create(email).toString();
-    const expiredCodeValue = Code.create(expiredCode).toString();
+    const email = Email.create(resendCodeCommand.email);
+    const expiredCode = Code.create(resendCodeCommand.expiredCode);
 
-    const codeLookup =
-      this.verificationCodeLookup.generateLookup(expiredCodeValue);
+    const codeLookup = this.verificationCodeLookup.generateLookup(
+      expiredCode.toString(),
+    );
 
     /** Obtener la cuenta asociada al accountId proporcionado */
     const verificationCode =
       await this.verificationCodeRepository.findExpiredForForwarding(
-        emailValue,
+        email.toString(),
         codeLookup,
       );
 
@@ -55,7 +56,7 @@ export class ResendCodeUseCase {
 
     /** Comparar el hash del código para filtrar el código de verificación actual */
     const isValid = await this.encryptor.compare(
-      expiredCodeValue,
+      expiredCode.toString(),
       verificationCode.codeHash,
     );
 
@@ -78,7 +79,7 @@ export class ResendCodeUseCase {
     await this.generateAndResendCode({
       oldVerficationCodeId: verificationCode.verificationCodeId,
       attempts: verificationCode.attempts,
-      email,
+      email: email.toString(),
     });
   }
 
@@ -90,16 +91,18 @@ export class ResendCodeUseCase {
     const { oldVerficationCodeId, attempts, email } = payload;
 
     /** Generar un nuevo código de verificación */
-    const code = VerificationCode.generate();
+    const generatedCode = VerificationCode.generate();
 
     /** Validar con el value object */
-    const codeValue = Code.create(code).toString();
+    const code = Code.create(generatedCode);
 
     /** Generar el codeLookup */
-    const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
+    const codeLookup = this.verificationCodeLookup.generateLookup(
+      code.toString(),
+    );
 
     /** Generar el hash para el nuevo código */
-    const codeHash = await this.encryptor.hash(codeValue, 10);
+    const codeHash = await this.encryptor.hash(code.toString(), 10);
 
     /** Actualizar a nivel de base de datos el valor del nuevo código */
     await this.verificationCodeRepository.refresh(oldVerficationCodeId, {
@@ -112,7 +115,7 @@ export class ResendCodeUseCase {
     await this.emailSender.sendEmail(
       email,
       'Código de verificación de CallOrder',
-      this.buildVerificationEmail(codeValue),
+      this.buildVerificationEmail(code.toString()),
     );
   }
 
