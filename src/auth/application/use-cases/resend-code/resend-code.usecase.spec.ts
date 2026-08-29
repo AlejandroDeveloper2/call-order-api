@@ -22,6 +22,10 @@ import {
 } from '../../exceptions';
 import { VerificationCodeValidationModel } from '../../../domain/models';
 import { VerificationCode } from '../../../domain/entities';
+import {
+  InvalidCodeFormatException,
+  InvalidEmailException,
+} from '../../../domain/exceptions';
 
 type VerificationCodeRepositoryMock = Pick<
   VerificationCodeRepositoryPort,
@@ -102,6 +106,52 @@ describe('ResendCodeUseCase', () => {
   });
 
   describe('run()', () => {
+    it('deberia lanzar InvalidEmailException si el correo es invalido', async () => {
+      // Arrange
+      const invalidEmail = 'jhon.doe';
+
+      // Act
+      const result = useCase.run({
+        ...resendCodeCommand,
+        email: invalidEmail,
+      });
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidEmailException);
+
+      expect(
+        verificationCodeRepositoryMock.findExpiredForForwarding,
+      ).not.toHaveBeenCalledWith();
+      expect(verificationCodeLookupMock.generateLookup).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.refresh).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar InvalidCodeFormatException si el código proporcionado no es valido', async () => {
+      // Arrange
+      const invalidCode = '1234';
+
+      // Act
+      const result = useCase.run({
+        ...resendCodeCommand,
+        expiredCode: invalidCode,
+      });
+
+      // Assert
+      await expect(result).rejects.toThrow(InvalidCodeFormatException);
+
+      expect(
+        verificationCodeRepositoryMock.findExpiredForForwarding,
+      ).not.toHaveBeenCalledWith();
+      expect(verificationCodeLookupMock.generateLookup).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
+      expect(encryptorMock.hash).not.toHaveBeenCalled();
+      expect(verificationCodeRepositoryMock.refresh).not.toHaveBeenCalled();
+      expect(emailSenderMock.sendEmail).not.toHaveBeenCalled();
+    });
+
     it('deberia lanzar InvalidCodeException cuando el correo proporcionado no exista', async () => {
       // Arrange
       const wrongEmail = 'peter.doe@example.com';
