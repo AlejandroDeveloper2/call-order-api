@@ -1,316 +1,431 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import { addMinutes } from 'date-fns';
-
 /** Puertos */
 import {
-  ACCOUNT_REPOSITORY,
-  AccountRepositoryPort,
-  SESSION_REPOSITORY,
-  SessionRepositoryPort,
-  VERIFICATION_CODE_REPOSITORY,
-  VerificationCodeRepositoryPort,
-} from '../../../domain/ports';
-import {
-  TRANSACTION_MANAGER,
-  TransactionContext,
+  DateHandlerPort,
+  IdGeneratorPort,
   TransactionManagerPort,
 } from '../../../../shared/domain/ports';
 
-/** Entidades de dominio */
-import { Session } from '../../../domain/entities';
+import {
+  AccessTokenGeneratorPort,
+  AccountRepositoryPort,
+  RefreshTokenGeneratorPort,
+  SessionRepositoryPort,
+  TokenHasherPort,
+  VerificationCodeLookupPort,
+  VerificationCodeRepositoryPort,
+} from '../../../domain/ports';
 
-/** Errores */
-import { AUTH_ERROR_CODES } from '../../../domain/exceptions/auth-error-codes';
+/** Modelos */
+import { VerificationCodeValidationModel } from '../../../domain/models';
+
+/** Commands */
+import { ValidateIdentityCommand } from '../../commands';
 
 /** Caso de uso */
 import { ValidateIdentityUseCase } from './validate-identity.usecase';
+import { ExpiredCodeException, InvalidCodeException } from '../../exceptions';
 
-/** DTO */
-import { ValidateIdentityDto } from '../../../infrastructure/dto';
-
-/** utilidades */
-import {
-  buildAccount,
-  buildVerificationCode,
-} from '../../../../shared/application/utils/domain-class-contructor';
-
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-session-id'),
-}));
-
-jest.mock('bcrypt', () => ({
-  compareSync: jest.fn(),
-  hash: jest.fn(),
-}));
+type AccountRepositoryMock = Pick<AccountRepositoryPort, 'updateLastLogin'>;
+type VerificationCodeRepositoryMock = Pick<
+  VerificationCodeRepositoryPort,
+  'findForIdentityValidation' | 'markAsUsed'
+>;
+type SessionRepositoryMock = Pick<
+  SessionRepositoryPort,
+  'revokeByAccountId' | 'create'
+>;
+type TransactionManagerMock = Pick<TransactionManagerPort, 'run'>;
+type IdGeneratorMock = Pick<IdGeneratorPort, 'generate'>;
+type TokenHasherMock = Pick<TokenHasherPort, 'compare' | 'hash'>;
+type AccessTokenGeneratorMock = Pick<AccessTokenGeneratorPort, 'generate'>;
+type RefreshTokenGeneratorMock = Pick<RefreshTokenGeneratorPort, 'generate'>;
+type VerificationCodeLookupMock = Pick<
+  VerificationCodeLookupPort,
+  'generateLookup'
+>;
+type DateHandlerMock = Pick<DateHandlerPort, 'isAfter' | 'addDays'>;
 
 describe('ValidateIdentityUseCase', () => {
   let useCase: ValidateIdentityUseCase;
+  let accountRepositoryMock: jest.Mocked<AccountRepositoryMock>;
+  let verificationCodeRepositoryMock: jest.Mocked<VerificationCodeRepositoryMock>;
+  let sessionRepositoryMock: jest.Mocked<SessionRepositoryMock>;
+  let transactionManagerMock: jest.Mocked<TransactionManagerMock>;
+  let idGeneratorMock: jest.Mocked<IdGeneratorMock>;
+  let tokenHasherMock: jest.Mocked<TokenHasherMock>;
+  let accessTokenGeneratorMock: jest.Mocked<AccessTokenGeneratorMock>;
+  let refreshTokenGeneratorMock: jest.Mocked<RefreshTokenGeneratorMock>;
+  let verificationCodeLookupMock: jest.Mocked<VerificationCodeLookupMock>;
+  let dateHandlerMock: jest.Mocked<DateHandlerMock>;
 
-  const jwtService = {
-    sign: jest.fn(),
-  } satisfies Pick<JwtService, 'sign'>;
+  const now = new Date('2026-08-30T15:00:00.000Z');
 
-  const verificationCodeRepository = {
-    update: jest.fn(),
-  } satisfies Pick<VerificationCodeRepositoryPort, 'update'>;
+  const expiresAt = new Date('2026-08-30T16:00:00.000Z');
 
-  const sessionRepository = {
-    create: jest.fn(),
-    revokeByAccountId: jest.fn(),
-  } satisfies Pick<SessionRepositoryPort, 'create' | 'revokeByAccountId'>;
+  const codeLookup = 'test-code-lookup';
 
-  const accountRepository = {
-    findById: jest.fn(),
-    update: jest.fn(),
-  } satisfies Pick<AccountRepositoryPort, 'update' | 'findById'>;
+  const accessToken =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30';
+  const refreshToken =
+    '3de3bc8b981cfecb3116b1a643163886e011fbfd877aba391298b1f3a56c012f8b3bcfb55643a08372ddcd3d1ab0c939e83fc236360ec289f9444b6c0cc9a7d0';
 
-  const mockTransactionManager = {
-    run: jest.fn(),
-  } satisfies TransactionManagerPort;
-
-  const bcryptCompareMock = jest.mocked<
-    (data: string | Buffer, encrypted: string) => boolean
-  >(bcrypt.compareSync);
-  const bcryptHashMock = jest.mocked<
-    (data: string | Buffer, saltOrRounds: string | number) => Promise<string>
-  >(bcrypt.hash);
-
-  const buildDto = (
-    overrides: Partial<ValidateIdentityDto> = {},
-  ): ValidateIdentityDto => ({
-    accountId: 'test-account-id',
+  const command: ValidateIdentityCommand = {
+    email: 'john.doe@example.com',
     verificationCode: '123456',
-    ...overrides,
-  });
+    browser: 'Chrome',
+    operatingSystem: 'Windows',
+    ipAddress: '127.0.0.1',
+    userAgent: 'Mozilla/5.0',
+    deviceName: 'My PC',
+    deviceType: 'desktop',
+  };
 
-  const transactionContext: TransactionContext = {};
+  const verificationCode: VerificationCodeValidationModel = {
+    verificationCodeId: 'verification-code-id',
+    codeHash: 'hashed-code',
+    expiresAt,
+    accountId: 'account-id',
+    attempts: 0,
+    profile: {
+      profileId: 'profile-id',
+      roleId: 'role-id',
+    },
+  };
 
-  beforeEach(async () => {
-    mockTransactionManager.run.mockImplementation(
-      async (callback: (transactionContext: unknown) => Promise<unknown>) =>
-        callback(transactionContext),
-    );
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ValidateIdentityUseCase,
-        {
-          provide: JwtService,
-          useValue: jwtService,
-        },
-        {
-          provide: VERIFICATION_CODE_REPOSITORY,
-          useValue: verificationCodeRepository,
-        },
-        {
-          provide: SESSION_REPOSITORY,
-          useValue: sessionRepository,
-        },
-        {
-          provide: ACCOUNT_REPOSITORY,
-          useValue: accountRepository,
-        },
-        {
-          provide: TRANSACTION_MANAGER,
-          useValue: mockTransactionManager,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get<ValidateIdentityUseCase>(ValidateIdentityUseCase);
-
+  beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(global, 'Date').mockImplementation(() => now);
+
+    accountRepositoryMock = {
+      updateLastLogin: jest.fn(),
+    };
+
+    verificationCodeRepositoryMock = {
+      findForIdentityValidation: jest.fn(),
+      markAsUsed: jest.fn(),
+    };
+
+    sessionRepositoryMock = {
+      revokeByAccountId: jest.fn(),
+      create: jest.fn(),
+    };
+
+    transactionManagerMock = {
+      run: jest.fn(),
+    };
+
+    idGeneratorMock = {
+      generate: jest.fn(),
+    };
+
+    tokenHasherMock = {
+      hash: jest.fn(),
+      compare: jest.fn(),
+    };
+
+    accessTokenGeneratorMock = {
+      generate: jest.fn(),
+    };
+
+    refreshTokenGeneratorMock = {
+      generate: jest.fn(),
+    };
+
+    verificationCodeLookupMock = {
+      generateLookup: jest.fn(),
+    };
+
+    dateHandlerMock = {
+      isAfter: jest.fn(),
+      addDays: jest.fn(),
+    };
+
+    useCase = new ValidateIdentityUseCase(
+      accountRepositoryMock as unknown as AccountRepositoryPort,
+      verificationCodeRepositoryMock as unknown as VerificationCodeRepositoryPort,
+      sessionRepositoryMock as unknown as SessionRepositoryPort,
+      transactionManagerMock,
+      idGeneratorMock,
+      tokenHasherMock,
+      accessTokenGeneratorMock,
+      refreshTokenGeneratorMock,
+      verificationCodeLookupMock,
+      dateHandlerMock as unknown as DateHandlerPort,
+    );
   });
 
-  describe('run', () => {
-    it('debe lanzar AppError cuando la cuenta no existe', async () => {
-      // Arrange
-      const accountId = 'wrong-account-id';
-      const dto = buildDto({ accountId });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-      accountRepository.findById.mockResolvedValue(null);
+  describe('(run)', () => {
+    it('deberia validar la identidad del usuario, crear la sesión y validar los tokens', async () => {
+      //Arrange
+      const tokenHash = 'hashed-access-token';
+      const refreshTokenHash = 'hashed-refresh-token';
 
-      // Act
-      const result = useCase.run(dto);
+      const sessionId = 'session-id';
 
-      // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.accountNotFound,
-        httpCode: 404,
-      });
+      const transactionContext = {
+        queryRunner: 'query-runner',
+      };
 
-      expect(accountRepository.findById).toHaveBeenCalledWith(accountId);
+      const sessionExpiresAt = new Date('2026-08-31T15:00:00.000Z');
 
-      expect(bcryptCompareMock).not.toHaveBeenCalled();
+      verificationCodeLookupMock.generateLookup.mockReturnValue(codeLookup);
 
-      expect(jwtService.sign).not.toHaveBeenCalled();
-
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-
-      expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
-
-      expect(mockTransactionManager.run).not.toHaveBeenCalled();
-
-      expect(sessionRepository.create).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
-    });
-
-    it('debe lanzar AppError cuando el código ingresado no es válido', async () => {
-      // Arrange
-      const dto = buildDto();
-
-      const verificationCode = buildVerificationCode();
-      const account = buildAccount({ verificationCodes: [verificationCode] });
-
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareMock.mockReturnValue(false);
-
-      // Act
-      const result = useCase.run(dto);
-
-      // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.invalidCode,
-        httpCode: 401,
-      });
-
-      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
-
-      expect(jwtService.sign).not.toHaveBeenCalled();
-
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-
-      expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
-
-      expect(mockTransactionManager.run).not.toHaveBeenCalled();
-
-      expect(sessionRepository.create).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
-    });
-
-    it('debe lanzar AppError cuando el código ha expirado', async () => {
-      // Arrange
-      const dto = buildDto();
-
-      const expiredVerificationCode = buildVerificationCode({
-        expiresAt: addMinutes(new Date(), -5),
-      });
-      const account = buildAccount({
-        verificationCodes: [expiredVerificationCode],
-      });
-
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareMock.mockReturnValue(true);
-
-      // Act
-      const result = useCase.run(dto);
-
-      // Assert
-      await expect(result).rejects.toMatchObject({
-        name: AUTH_ERROR_CODES.expiredCode,
-        httpCode: 401,
-      });
-
-      expect(accountRepository.findById).toHaveBeenCalledWith(dto.accountId);
-
-      expect(jwtService.sign).not.toHaveBeenCalled();
-
-      expect(bcryptHashMock).not.toHaveBeenCalled();
-
-      expect(sessionRepository.revokeByAccountId).not.toHaveBeenCalled();
-
-      expect(mockTransactionManager.run).not.toHaveBeenCalled();
-      expect(sessionRepository.create).not.toHaveBeenCalled();
-      expect(verificationCodeRepository.update).not.toHaveBeenCalled();
-      expect(accountRepository.update).not.toHaveBeenCalled();
-    });
-
-    it('debe crear una nueva sesión, invalidar el código, marcar el último inicio de sesión dentro de una transacción y retornar los tokens cuando la identidad es válida', async () => {
-      // Arrange
-      const dto = buildDto({
-        browser: 'Chrome',
-        operatingSystem: 'Windows',
-        ipAddress: '127.0.0.1',
-        userAgent: 'Mozilla/5.0',
-        deviceName: 'PC',
-        deviceType: 'desktop',
-      });
-
-      const validVerificationCode = buildVerificationCode();
-      const account = buildAccount({
-        verificationCodes: [validVerificationCode],
-      });
-
-      accountRepository.findById.mockResolvedValue(account);
-
-      bcryptCompareMock.mockReturnValue(true);
-
-      jwtService.sign.mockReturnValue('access-token');
-
-      bcryptHashMock
-        .mockResolvedValueOnce('access-token-hash')
-        .mockResolvedValueOnce('refresh-token-hash');
-
-      sessionRepository.revokeByAccountId.mockResolvedValue(undefined);
-      sessionRepository.create.mockResolvedValue(undefined);
-      verificationCodeRepository.update.mockResolvedValue(undefined);
-      accountRepository.update.mockResolvedValue(undefined);
-
-      // Act
-      const result = await useCase.run(dto);
-
-      // Assert
-      expect(result.token).toBe('access-token');
-      expect(result.refreshToken).toEqual(expect.any(String));
-      expect(result.refreshToken).toHaveLength(128);
-
-      expect(jwtService.sign).toHaveBeenCalledTimes(1);
-
-      expect(jwtService.sign).toHaveBeenCalledWith({
-        accountId: dto.accountId,
-        roleId: account.profile.role.roleId,
-        profileId: account.profile.userId,
-      });
-
-      expect(bcryptHashMock).toHaveBeenCalledTimes(2);
-
-      expect(sessionRepository.revokeByAccountId).toHaveBeenCalledTimes(1);
-
-      expect(sessionRepository.revokeByAccountId).toHaveBeenCalledWith(
-        dto.accountId,
-        expect.any(Date),
+      verificationCodeRepositoryMock.findForIdentityValidation.mockResolvedValue(
+        verificationCode,
       );
 
-      expect(mockTransactionManager.run).toHaveBeenCalledTimes(1);
+      tokenHasherMock.compare.mockReturnValue(true);
 
-      expect(sessionRepository.create).toHaveBeenCalledTimes(1);
-      expect(verificationCodeRepository.update).toHaveBeenCalledTimes(1);
-      expect(accountRepository.update).toHaveBeenCalledTimes(1);
+      dateHandlerMock.isAfter.mockReturnValue(false);
 
-      expect(sessionRepository.create).toHaveBeenCalledWith(
-        expect.any(Session),
+      accessTokenGeneratorMock.generate.mockResolvedValue(accessToken);
+
+      refreshTokenGeneratorMock.generate.mockReturnValue(refreshToken);
+
+      tokenHasherMock.hash
+        .mockReturnValueOnce(tokenHash)
+        .mockReturnValueOnce(refreshTokenHash);
+
+      dateHandlerMock.addDays.mockReturnValue(sessionExpiresAt);
+
+      idGeneratorMock.generate.mockReturnValue(sessionId);
+
+      transactionManagerMock.run.mockImplementation(async (callback) =>
+        callback(transactionContext),
+      );
+
+      // Act
+      const result = await useCase.run(command);
+
+      // Assert
+      expect(result).toEqual({
+        token: accessToken,
+        refreshToken,
+      });
+
+      expect(verificationCodeLookupMock.generateLookup).toHaveBeenCalledWith(
+        command.verificationCode,
+      );
+
+      expect(
+        verificationCodeRepositoryMock.findForIdentityValidation,
+      ).toHaveBeenCalledWith(command.email, codeLookup);
+
+      expect(tokenHasherMock.compare).toHaveBeenCalledWith(
+        command.verificationCode,
+        verificationCode.codeHash,
+      );
+
+      expect(accessTokenGeneratorMock.generate).toHaveBeenCalledWith({
+        accountId: verificationCode.accountId,
+        roleId: verificationCode.profile.roleId,
+        profileId: verificationCode.profile.profileId,
+      });
+
+      expect(refreshTokenGeneratorMock.generate).toHaveBeenCalledTimes(1);
+
+      expect(tokenHasherMock.hash).toHaveBeenCalledTimes(2);
+
+      expect(sessionRepositoryMock.revokeByAccountId).toHaveBeenCalledWith(
+        verificationCode.accountId,
+        now,
+      );
+
+      expect(transactionManagerMock.run).toHaveBeenCalledTimes(1);
+
+      expect(sessionRepositoryMock.create).toHaveBeenCalledTimes(1);
+
+      expect(verificationCodeRepositoryMock.markAsUsed).toHaveBeenCalledTimes(
+        1,
+      );
+
+      expect(accountRepositoryMock.updateLastLogin).toHaveBeenCalledTimes(1);
+    });
+
+    it('deberia lanzar InvalidCodeException si el código de verificación no existe', async () => {
+      // Arrange
+      verificationCodeLookupMock.generateLookup.mockReturnValue(codeLookup);
+
+      verificationCodeRepositoryMock.findForIdentityValidation.mockResolvedValue(
+        null,
+      );
+
+      // Act
+      const promise = useCase.run(command);
+
+      // Assert
+      await expect(promise).rejects.toBeInstanceOf(InvalidCodeException);
+
+      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
+
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+
+      expect(sessionRepositoryMock.revokeByAccountId).not.toHaveBeenCalled();
+
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar InvalidCodeException cuando el hash del código de verificación es invalido', async () => {
+      // Arrange
+      verificationCodeLookupMock.generateLookup.mockReturnValue(codeLookup);
+
+      verificationCodeRepositoryMock.findForIdentityValidation.mockResolvedValue(
+        verificationCode,
+      );
+
+      tokenHasherMock.compare.mockReturnValue(false);
+
+      // Act
+      const promise = useCase.run(command);
+
+      // Assert
+      await expect(promise).rejects.toBeInstanceOf(InvalidCodeException);
+
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+
+      expect(sessionRepositoryMock.revokeByAccountId).not.toHaveBeenCalled();
+
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar ExpiredCodeException si el código de verificación ha expirado', async () => {
+      // Arrange
+      verificationCodeLookupMock.generateLookup.mockReturnValue(codeLookup);
+
+      verificationCodeRepositoryMock.findForIdentityValidation.mockResolvedValue(
+        verificationCode,
+      );
+
+      tokenHasherMock.compare.mockReturnValue(true);
+
+      dateHandlerMock.isAfter.mockReturnValue(true);
+
+      //Act
+      const promise = useCase.run(command);
+
+      //Assert
+      await expect(promise).rejects.toBeInstanceOf(ExpiredCodeException);
+
+      expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
+
+      expect(refreshTokenGeneratorMock.generate).not.toHaveBeenCalled();
+
+      expect(sessionRepositoryMock.revokeByAccountId).not.toHaveBeenCalled();
+
+      expect(transactionManagerMock.run).not.toHaveBeenCalled();
+    });
+
+    it('deberia usar los valores por defecto cuando se crea una sesión, si los metadatos opcionales de la sesión son omitidos', async () => {
+      // Arrange
+      const commandWithoutMetadata: ValidateIdentityCommand = {
+        email: command.email,
+        verificationCode: command.verificationCode,
+      };
+
+      verificationCodeLookupMock.generateLookup.mockReturnValue(codeLookup);
+
+      verificationCodeRepositoryMock.findForIdentityValidation.mockResolvedValue(
+        verificationCode,
+      );
+
+      tokenHasherMock.compare.mockReturnValue(true);
+
+      dateHandlerMock.isAfter.mockReturnValue(false);
+
+      accessTokenGeneratorMock.generate.mockResolvedValue(accessToken);
+
+      refreshTokenGeneratorMock.generate.mockReturnValue(refreshToken);
+
+      tokenHasherMock.hash
+        .mockReturnValueOnce('token-hash')
+        .mockReturnValueOnce('refresh-token-hash');
+
+      dateHandlerMock.addDays.mockReturnValue(
+        new Date('2026-08-31T15:00:00.000Z'),
+      );
+
+      idGeneratorMock.generate.mockReturnValue('session-id');
+
+      transactionManagerMock.run.mockImplementation(async (callback) =>
+        callback({}),
+      );
+
+      //Act
+      await useCase.run(commandWithoutMetadata);
+
+      // Assert
+
+      const [session] = sessionRepositoryMock.create.mock.calls[0];
+
+      expect(session).toBeDefined();
+
+      expect(session.getBrowser).toBe('unknown');
+
+      expect(session.getOperatingSystem).toBe('unknown');
+
+      expect(session.getIpAddress).toBe('0.0.0.0');
+
+      expect(session.getUserAgent).toBe('');
+    });
+
+    it('deberia usar el mismo contexto transaccional para todas las operaciones de persistencia, cuando la transacción es ejecutada', async () => {
+      // Arrange
+      verificationCodeLookupMock.generateLookup.mockReturnValue(codeLookup);
+
+      verificationCodeRepositoryMock.findForIdentityValidation.mockResolvedValue(
+        verificationCode,
+      );
+
+      tokenHasherMock.compare.mockReturnValue(true);
+
+      dateHandlerMock.isAfter.mockReturnValue(false);
+
+      accessTokenGeneratorMock.generate.mockResolvedValue(accessToken);
+
+      refreshTokenGeneratorMock.generate.mockReturnValue(refreshToken);
+
+      tokenHasherMock.hash
+        .mockReturnValueOnce('token-hash')
+        .mockReturnValueOnce('refresh-token-hash');
+
+      dateHandlerMock.addDays.mockReturnValue(
+        new Date('2026-08-31T15:00:00.000Z'),
+      );
+
+      idGeneratorMock.generate.mockReturnValue('session-id');
+
+      const transactionContext = {
+        id: 'transaction-context',
+      };
+
+      transactionManagerMock.run.mockImplementation(async (callback) =>
+        callback(transactionContext),
+      );
+
+      // Act
+      await useCase.run(command);
+
+      // Assert
+      expect(sessionRepositoryMock.create).toHaveBeenCalledWith(
+        expect.anything(),
         transactionContext,
       );
 
-      expect(verificationCodeRepository.update).toHaveBeenCalledWith(
-        validVerificationCode.verificationCodeId,
-        expect.objectContaining({
-          usedAt: expect.any(Date) as Date,
-        }),
+      expect(verificationCodeRepositoryMock.markAsUsed).toHaveBeenCalledWith(
+        verificationCode.verificationCodeId,
+        now,
         transactionContext,
       );
 
-      expect(accountRepository.update).toHaveBeenCalledWith(
-        dto.accountId,
-        expect.objectContaining({
-          lastLoginAt: expect.any(Date) as Date,
-        }),
+      expect(accountRepositoryMock.updateLastLogin).toHaveBeenCalledWith(
+        verificationCode.accountId,
+        now,
         transactionContext,
       );
     });

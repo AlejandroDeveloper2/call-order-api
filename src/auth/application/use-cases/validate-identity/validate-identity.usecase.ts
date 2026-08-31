@@ -5,7 +5,6 @@ import { Session } from '../../../domain/entities';
 import {
   AccessTokenGeneratorPort,
   AccountRepositoryPort,
-  DateHandlerPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
   TokenHasherPort,
@@ -14,6 +13,7 @@ import {
 } from '../../../domain/ports';
 
 import {
+  DateHandlerPort,
   IdGeneratorPort,
   TransactionManagerPort,
 } from '../../../../shared/domain/ports';
@@ -54,15 +54,17 @@ export class ValidateIdentityUseCase {
     code: string,
   ): Promise<VerificationCodeValidationModel> {
     /** Validar entradas importantes con los value objects */
-    const emailValue = Email.create(email).toString();
-    const codeValue = Code.create(code).toString();
+    const emailValue = Email.create(email);
+    const codeValue = Code.create(code);
 
-    const codeLookup = this.verificationCodeLookup.generateLookup(codeValue);
+    const codeLookup = this.verificationCodeLookup.generateLookup(
+      codeValue.toString(),
+    );
 
     /** Obtener el último código de verificación activo  */
     const verificationCode =
       await this.verificationCodeRepository.findForIdentityValidation(
-        emailValue,
+        emailValue.toString(),
         codeLookup,
       );
 
@@ -71,7 +73,7 @@ export class ValidateIdentityUseCase {
 
     /** Comparar el hash del código para filtrar el código de verificación actual */
     const isValid = this.tokenHasher.compare(
-      codeValue,
+      codeValue.toString(),
       verificationCode.codeHash,
     );
 
@@ -109,21 +111,21 @@ export class ValidateIdentityUseCase {
       );
 
     /** Generar el token y refresh token */
-    const token = await this.accessTokenGenerator.generate({
+    const generatedToken = await this.accessTokenGenerator.generate({
       accountId: validCode.accountId,
       roleId: validCode.profile.roleId,
       profileId: validCode.profile.profileId,
     });
 
-    const refreshToken = this.refreshTokenGenerator.generate();
+    const generatedRefreshToken = this.refreshTokenGenerator.generate();
 
     /** Validar con value objects */
-    const tokenValue = JwtAccessToken.create(token).toString();
-    const refreshTokenValue = RefreshToken.create(refreshToken).toString();
+    const token = JwtAccessToken.create(generatedToken);
+    const refreshToken = RefreshToken.create(generatedRefreshToken);
 
     /** Encriptar ambos token para agregar una capa solida de seguridad */
-    const tokenHash = this.tokenHasher.hash(tokenValue);
-    const refreshTokenHash = this.tokenHasher.hash(refreshTokenValue);
+    const tokenHash = this.tokenHasher.hash(token.toString());
+    const refreshTokenHash = this.tokenHasher.hash(refreshToken.toString());
 
     /** Invalidar las sesiones activas anteriores de la misma cuenta en una sola consulta */
     await this.sessionRepository.revokeByAccountId(
@@ -173,8 +175,8 @@ export class ValidateIdentityUseCase {
     });
 
     return {
-      token: tokenValue,
-      refreshToken: refreshTokenValue,
+      token: token.toString(),
+      refreshToken: refreshToken.toString(),
     };
   }
 }
