@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
 /** Entidades */
-import { Role } from '../../../users/domain/entities';
+import { Account } from '../../domain/entities';
 
 /** Controller */
 import { AuthController } from './auth.controller';
@@ -19,6 +19,7 @@ import {
   ValidateSessionUseCase,
   ChangePasswordUseCase,
   UpdatePasswordUseCase,
+  FindAccountsUseCase,
 } from '../../application/use-cases';
 
 /** DTOs */
@@ -30,6 +31,7 @@ import {
   UpdateEmailDto,
   ValidateIdentityDto,
   UpdatePasswordDto,
+  FindAccountsQueryDto,
 } from '../dto';
 
 jest.mock('uuid', () => ({
@@ -38,6 +40,10 @@ jest.mock('uuid', () => ({
 
 describe('AuthController', () => {
   let controller: AuthController;
+
+  const findAccountsUseCase = {
+    run: jest.fn(),
+  } satisfies Pick<FindAccountsUseCase, 'run'>;
 
   const loginUseCase = {
     run: jest.fn(),
@@ -89,6 +95,10 @@ describe('AuthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
+        {
+          provide: FindAccountsUseCase,
+          useValue: findAccountsUseCase,
+        },
         {
           provide: LoginUseCase,
           useValue: loginUseCase,
@@ -143,6 +153,30 @@ describe('AuthController', () => {
     });
   });
 
+  describe('getAccounts', () => {
+    it('debe delegar los datos al getAccounts y retornar su resultado', async () => {
+      //Arrange
+      const query: FindAccountsQueryDto = {};
+
+      const expectedResult = {
+        records: expect.any([Account]) as Account[],
+        page: expect.any(Number) as number,
+        totalPages: expect.any(Number) as number,
+        totalRecords: expect.any(Number) as number,
+      };
+
+      findAccountsUseCase.run.mockResolvedValue(expectedResult);
+
+      //Act
+      const result = await controller.getAccounts(query);
+
+      //Assert
+      expect(findAccountsUseCase.run).toHaveBeenCalledTimes(1);
+      expect(findAccountsUseCase.run).toHaveBeenCalledWith(query);
+      expect(result).toBe(expectedResult);
+    });
+  });
+
   describe('postLogin', () => {
     it('debe delegar las credenciales al LoginUseCase y retornar su resultado', async () => {
       // Arrange
@@ -170,7 +204,7 @@ describe('AuthController', () => {
       // Arrange
       const dto: ValidateIdentityDto = {
         verificationCode: '123456',
-        accountId: 'test-account-id',
+        email: 'jhon.doe@example.com',
       };
 
       const expectedResult = {
@@ -211,7 +245,7 @@ describe('AuthController', () => {
         password: 'Diego123@',
         fullname: 'Diego Diaz',
         phone: '3105073199',
-        role: new Role('role-test-id', 'role-name'),
+        roleId: 'role-test-id',
       };
 
       const expectedResult = undefined;
@@ -232,7 +266,6 @@ describe('AuthController', () => {
     it('debe delegar los datos al ResendCodeUseCase y retornar su resultado', async () => {
       // Arrange
       const dto: ResendCodeDto = {
-        accountId: 'test-account-id',
         email: 'test@gmail.com',
         expiredCode: '123456',
       };
