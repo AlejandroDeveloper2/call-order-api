@@ -23,6 +23,8 @@ import { ValidateIdentityCommand } from '../../commands';
 
 /** Caso de uso */
 import { ValidateIdentityUseCase } from './validate-identity.usecase';
+
+/** Excepciones de aplicación */
 import { ExpiredCodeException, InvalidCodeException } from '../../exceptions';
 
 type AccountRepositoryMock = Pick<AccountRepositoryPort, 'updateLastLogin'>;
