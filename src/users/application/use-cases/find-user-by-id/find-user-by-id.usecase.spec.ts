@@ -1,74 +1,71 @@
-import { Test, TestingModule } from '@nestjs/testing';
-
-/** Excepciones de dominio */
-import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
+/** Entidades */
+import { User } from '../../../domain/entities';
 
 /** Puertos */
-import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
+import { UserRepositoryPort } from '../../../domain/ports';
 
 /** Casos de uso */
 import { FindUserByIdUseCase } from './find-user-by-id.usecase';
 
-/** utilidades */
-import { buildProfile } from '../../../../shared/application/utils/domain-class-contructor';
+/** Excepciones de aplicación */
+import { UserNotFoundException } from '../../exceptions';
+
+type UserRepositoryMock = Pick<UserRepositoryPort, 'findById'>;
 
 describe('FindUserByIdUseCase', () => {
   let useCase: FindUserByIdUseCase;
+  let userRepositoryMock: jest.Mocked<UserRepositoryMock>;
 
-  const mockUserRepository = {
-    findById: jest.fn(),
-  } satisfies Pick<UserRepositoryPort, 'findById'>;
+  beforeEach(() => {
+    userRepositoryMock = {
+      findById: jest.fn(),
+    };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        FindUserByIdUseCase,
-        {
-          provide: USER_REPOSITORY,
-          useValue: mockUserRepository,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get(FindUserByIdUseCase);
+    useCase = new FindUserByIdUseCase(
+      userRepositoryMock as unknown as UserRepositoryPort,
+    );
 
     jest.clearAllMocks();
   });
 
+  const user: User = User.create(
+    'test-user-id',
+    'Alejo Diaz',
+    'test-role-id',
+    undefined,
+    '+573105998799',
+    true,
+  );
+
   describe('run()', () => {
-    it('debe lanzar AppError cuando el perfil de usuario no existe', async () => {
+    it('debe lanzar UserNotFoundException cuando el perfil de usuario no existe', async () => {
       //Arrange
       const profileId: string = 'wrong-profile-id';
 
-      mockUserRepository.findById.mockResolvedValue(null);
+      userRepositoryMock.findById.mockResolvedValue(null);
 
       //Act
       const profile = useCase.run(profileId);
 
       //Assert
-      await expect(profile).rejects.toMatchObject({
-        name: USER_ERROR_CODES.userNotFound,
-        httpCode: 404,
-      });
+      await expect(profile).rejects.toThrow(UserNotFoundException);
 
-      expect(mockUserRepository.findById).toHaveBeenCalledWith(profileId);
+      expect(userRepositoryMock.findById).toHaveBeenCalledWith(profileId);
     });
 
     it('debe traer un usuario cuando el profileId corresponde a un usuario registrado', async () => {
       //Arrange
-      const profileId: string = 'test-profile-id';
+      const profileId: string = 'test-user-id';
 
-      const expectedProfile = buildProfile();
-
-      mockUserRepository.findById.mockResolvedValue(expectedProfile);
+      userRepositoryMock.findById.mockResolvedValue(user);
 
       //Act
       const profile = await useCase.run(profileId);
 
       //Assert
-      expect(profile).toBe(expectedProfile);
+      expect(profile).toEqual(user);
 
-      expect(mockUserRepository.findById).toHaveBeenCalledWith(profileId);
+      expect(userRepositoryMock.findById).toHaveBeenCalledWith(profileId);
     });
   });
 });

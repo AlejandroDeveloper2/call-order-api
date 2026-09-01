@@ -1,84 +1,109 @@
-import { Test, TestingModule } from '@nestjs/testing';
-
 /** Puertos */
-import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
+import { UserRepositoryPort } from '../../../domain/ports';
 
-/** Excepciones de dominio */
-import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
+/** Errores de dominio */
+import {
+  InvalidFullnameException,
+  InvalidPhoneException,
+} from '../../../../shared/domain/exceptions';
 
-/** Dtos */
-import { UpdateUserDto } from '../../../infrastructure/dto';
+/** Commands */
+import { UpdateUserCommand } from '../../commands';
+
+/** Excepciones de aplicación */
+import { UserNotFoundException } from '../../exceptions';
+
 /** Caso de uso */
 import { UpdateProfileUseCase } from './update-profile.usecase';
 
+type UserRepositoryMock = Pick<UserRepositoryPort, 'updateProfile'>;
+
 describe('UpdateProfileUseCase', () => {
   let useCase: UpdateProfileUseCase;
+  let userRepositoryMock: jest.Mocked<UserRepositoryMock>;
 
-  const mockUserRepository = {
-    update: jest.fn(),
-  } satisfies Pick<UserRepositoryPort, 'update'>;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UpdateProfileUseCase,
-        {
-          provide: USER_REPOSITORY,
-          useValue: mockUserRepository,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get(UpdateProfileUseCase);
+  beforeEach(() => {
+    userRepositoryMock = {
+      updateProfile: jest.fn(),
+    };
+    useCase = new UpdateProfileUseCase(
+      userRepositoryMock as unknown as UserRepositoryPort,
+    );
 
     jest.clearAllMocks();
   });
 
+  const command: UpdateUserCommand = {
+    fullname: 'Juan Pérez',
+    phone: '+573001234567',
+  };
+
   describe('run()', () => {
-    it('debe lanzar AppError cuando el perfil no existe', async () => {
+    it('deberia lanzar InvalidFullnameException si el nombre completo es invalido', async () => {
       //Arrange
-      const wrongProfileId = 'wrong-user-id';
-      const dto: UpdateUserDto = {
-        fullname: 'Juan Pérez',
+      const invalidCommand: UpdateUserCommand = {
+        fullname: 'Juan123',
         phone: '3001234567',
       };
 
-      mockUserRepository.update.mockResolvedValue(0);
-
       //Act
-      const result = useCase.run(wrongProfileId, dto);
+      const result = useCase.run('test-user-id', invalidCommand);
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: USER_ERROR_CODES.userNotFound,
-        httpCode: 404,
-      });
+      await expect(result).rejects.toThrow(InvalidFullnameException);
 
-      expect(mockUserRepository.update).toHaveBeenCalledWith(
+      expect(userRepositoryMock.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('deberia lanzar InvalidPhoneException si el telefono es invalido', async () => {
+      //Arrange
+      const invalidCommand: UpdateUserCommand = {
+        fullname: 'Juan Pérez',
+        phone: 'invalid-phone',
+      };
+
+      //Act
+      const result = useCase.run('test-user-id', invalidCommand);
+
+      //Assert
+      await expect(result).rejects.toThrow(InvalidPhoneException);
+
+      expect(userRepositoryMock.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('debe lanzar UserNotFoundException cuando el perfil no existe', async () => {
+      //Arrange
+      const wrongProfileId = 'wrong-user-id';
+
+      userRepositoryMock.updateProfile.mockResolvedValue(0);
+
+      //Act
+      const result = useCase.run(wrongProfileId, command);
+
+      //Assert
+      await expect(result).rejects.toThrow(UserNotFoundException);
+
+      expect(userRepositoryMock.updateProfile).toHaveBeenCalledWith(
         wrongProfileId,
-        expect.objectContaining(dto),
+        expect.objectContaining(command),
       );
     });
 
     it('debe actualizar un perfil de usuario cuando este existe', async () => {
       //Arrange
       const profileId = 'test-user-id';
-      const dto: UpdateUserDto = {
-        fullname: 'Juan Pérez',
-        phone: '3001234567',
-      };
 
-      mockUserRepository.update.mockResolvedValue(1);
+      userRepositoryMock.updateProfile.mockResolvedValue(1);
 
       //Act
-      const result = await useCase.run(profileId, dto);
+      const result = await useCase.run(profileId, command);
 
       //Assert
       expect(result).toBeUndefined();
 
-      expect(mockUserRepository.update).toHaveBeenCalledWith(
+      expect(userRepositoryMock.updateProfile).toHaveBeenCalledWith(
         profileId,
-        expect.objectContaining(dto),
+        expect.objectContaining(command),
       );
     });
   });

@@ -1,129 +1,116 @@
-import { Test, TestingModule } from '@nestjs/testing';
-
 /** Puertos */
-import { USER_REPOSITORY, UserRepositoryPort } from '../../../domain/ports';
-
-/** Excepciones de dominio */
-import { USER_ERROR_CODES } from '../../../domain/exceptions/user-error-codes';
+import { UserRepositoryPort } from '../../../domain/ports';
 
 /** Dtos */
-import { UpdateUserStatusDto } from '../../../infrastructure/dto';
+import { UpdateUserStatusCommand } from '../../commands';
+
+/** Excepciones de aplicación */
+import { UserNotFoundException } from '../../exceptions';
+
 /** Caso de uso */
 import { UpdateUserStatusUseCase } from './update-user-status.usecase';
 
+type UserRepositoryMock = Pick<UserRepositoryPort, 'deactivate' | 'activate'>;
+
 describe('UpdateUserStatusUseCase', () => {
   let useCase: UpdateUserStatusUseCase;
+  let userRepositoryMock: jest.Mocked<UserRepositoryMock>;
 
-  const mockUserRepository = {
-    activate: jest.fn(),
-    deactivate: jest.fn(),
-  } satisfies Pick<UserRepositoryPort, 'activate' | 'deactivate'>;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UpdateUserStatusUseCase,
-        {
-          provide: USER_REPOSITORY,
-          useValue: mockUserRepository,
-        },
-      ],
-    }).compile();
-
-    useCase = module.get(UpdateUserStatusUseCase);
+  beforeEach(() => {
+    userRepositoryMock = {
+      activate: jest.fn(),
+      deactivate: jest.fn(),
+    };
+    useCase = new UpdateUserStatusUseCase(
+      userRepositoryMock as unknown as UserRepositoryPort,
+    );
 
     jest.clearAllMocks();
   });
 
   describe('run()', () => {
-    it('debe lanzar AppError cuando el perfil no existe en el caso de activación del perfil', async () => {
+    it('debe lanzar UserNotFoundException cuando el perfil no existe en el caso de activación del perfil', async () => {
       //Arrange
       const wrongProfileId = 'wrong-user-id';
-      const dto: UpdateUserStatusDto = {
+      const command: UpdateUserStatusCommand = {
         status: 'active',
       };
 
-      mockUserRepository.activate.mockResolvedValue(0);
+      userRepositoryMock.activate.mockResolvedValue(0);
 
       //Act
-      const result = useCase.run(wrongProfileId, dto);
+      const result = useCase.run(wrongProfileId, command);
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: USER_ERROR_CODES.userNotFound,
-        httpCode: 404,
-      });
+      await expect(result).rejects.toThrow(UserNotFoundException);
 
-      expect(mockUserRepository.activate).toHaveBeenCalledWith(wrongProfileId);
-      expect(mockUserRepository.deactivate).not.toHaveBeenCalled();
+      expect(userRepositoryMock.activate).toHaveBeenCalledWith(wrongProfileId);
+      expect(userRepositoryMock.deactivate).not.toHaveBeenCalled();
     });
 
-    it('debe lanzar AppError cuando el perfil no existe en el caso de desactivación del perfil', async () => {
+    it('debe lanzar UserNotFoundException cuando el perfil no existe en el caso de desactivación del perfil', async () => {
       //Arrange
       const wrongProfileId = 'wrong-user-id';
-      const dto: UpdateUserStatusDto = {
+      const command: UpdateUserStatusCommand = {
         status: 'inactive',
       };
 
-      mockUserRepository.deactivate.mockResolvedValue(0);
+      userRepositoryMock.deactivate.mockResolvedValue(0);
 
       //Act
-      const result = useCase.run(wrongProfileId, dto);
+      const result = useCase.run(wrongProfileId, command);
 
       //Assert
-      await expect(result).rejects.toMatchObject({
-        name: USER_ERROR_CODES.userNotFound,
-        httpCode: 404,
-      });
+      await expect(result).rejects.toThrow(UserNotFoundException);
 
-      expect(mockUserRepository.deactivate).toHaveBeenCalledWith(
+      expect(userRepositoryMock.deactivate).toHaveBeenCalledWith(
         wrongProfileId,
       );
-      expect(mockUserRepository.activate).not.toHaveBeenCalled();
+      expect(userRepositoryMock.activate).not.toHaveBeenCalled();
     });
 
     it('debe actualizar el estado de un perfil de usuario a `activo` cuando este existe', async () => {
       //Arrange
       const profileId = 'test-user-id';
-      const dto: UpdateUserStatusDto = {
+      const command: UpdateUserStatusCommand = {
         status: 'active',
       };
 
-      mockUserRepository.activate.mockResolvedValue(1);
+      userRepositoryMock.activate.mockResolvedValue(1);
 
       //Act
-      const result = await useCase.run(profileId, dto);
+      const result = await useCase.run(profileId, command);
 
       //Assert
       expect(result).toBeUndefined();
 
-      expect(mockUserRepository.activate).toHaveBeenCalledTimes(1);
+      expect(userRepositoryMock.activate).toHaveBeenCalledTimes(1);
 
-      expect(mockUserRepository.activate).toHaveBeenCalledWith(profileId);
+      expect(userRepositoryMock.activate).toHaveBeenCalledWith(profileId);
 
-      expect(mockUserRepository.deactivate).not.toHaveBeenCalled();
+      expect(userRepositoryMock.deactivate).not.toHaveBeenCalled();
     });
 
     it('debe actualizar el estado de un perfil de usuario a `inactivo` cuando este existe', async () => {
       //Arrange
       const profileId = 'test-user-id';
-      const dto: UpdateUserStatusDto = {
+      const command: UpdateUserStatusCommand = {
         status: 'inactive',
       };
 
-      mockUserRepository.deactivate.mockResolvedValue(1);
+      userRepositoryMock.deactivate.mockResolvedValue(1);
 
       //Act
-      const result = await useCase.run(profileId, dto);
+      const result = await useCase.run(profileId, command);
 
       //Assert
       expect(result).toBeUndefined();
 
-      expect(mockUserRepository.deactivate).toHaveBeenCalledTimes(1);
+      expect(userRepositoryMock.deactivate).toHaveBeenCalledTimes(1);
 
-      expect(mockUserRepository.deactivate).toHaveBeenCalledWith(profileId);
+      expect(userRepositoryMock.deactivate).toHaveBeenCalledWith(profileId);
 
-      expect(mockUserRepository.activate).not.toHaveBeenCalled();
+      expect(userRepositoryMock.activate).not.toHaveBeenCalled();
     });
   });
 });
