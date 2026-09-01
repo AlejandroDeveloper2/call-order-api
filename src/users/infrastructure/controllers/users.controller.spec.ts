@@ -4,15 +4,22 @@ import { User } from '../../domain/entities';
 
 import {
   FindUserByIdUseCase,
-  FindUsersUseCase,
   UpdateProfileUseCase,
   UpdateUserAvatarUseCase,
   UpdateUserStatusUseCase,
 } from '../../application/use-cases';
-import { UserQueryDto, UpdateUserStatusDto, UpdateUserDto } from '../dto';
+
+import { UpdateUserStatusDto, UpdateUserDto } from '../dto';
 
 import { UsersController } from './users.controller';
-import { CloudinaryAdpater } from '../../../shared/infrastructure/adapters';
+
+import { FILE_UPLOADER } from '../../../shared/domain/ports';
+
+import { CloudinaryUploadInterceptor } from '../../../shared/infrastructure/interceptors';
+
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'test-user-id'),
+}));
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -20,10 +27,6 @@ describe('UsersController', () => {
   const mockFindUserByIdUseCase = {
     run: jest.fn(),
   } satisfies Pick<FindUserByIdUseCase, 'run'>;
-
-  const mockFindUsersUseCase = {
-    run: jest.fn(),
-  } satisfies Pick<FindUsersUseCase, 'run'>;
 
   const mockUpdateProfileUseCase = {
     run: jest.fn(),
@@ -37,23 +40,18 @@ describe('UsersController', () => {
     run: jest.fn(),
   } satisfies Pick<UpdateUserAvatarUseCase, 'run'>;
 
-  const mockCloudinaryAdapter = {
-    uploadFile: jest.fn(),
-  } satisfies Pick<CloudinaryAdpater, 'uploadFile'>;
-
   beforeEach(async () => {
+    const mockFileUploader = {
+      uploadFile: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
         {
-          provide: CloudinaryAdpater,
-          useValue: mockCloudinaryAdapter,
-        },
-        {
           provide: FindUserByIdUseCase,
           useValue: mockFindUserByIdUseCase,
         },
-        { provide: FindUsersUseCase, useValue: mockFindUsersUseCase },
         { provide: UpdateProfileUseCase, useValue: mockUpdateProfileUseCase },
         {
           provide: UpdateUserStatusUseCase,
@@ -63,6 +61,11 @@ describe('UsersController', () => {
           provide: UpdateUserAvatarUseCase,
           useValue: mockUpdateUserAvatarUseCase,
         },
+        {
+          provide: FILE_UPLOADER,
+          useValue: mockFileUploader,
+        },
+        CloudinaryUploadInterceptor,
       ],
     }).compile();
 
@@ -92,30 +95,6 @@ describe('UsersController', () => {
       //Assert
       expect(mockFindUserByIdUseCase.run).toHaveBeenCalledTimes(1);
       expect(mockFindUserByIdUseCase.run).toHaveBeenCalledWith(userId);
-      expect(result).toBe(expectedResult);
-    });
-  });
-
-  describe('getUsers', () => {
-    it('debe delegar los datos al getUsers y retornar su resultado', async () => {
-      //Arrange
-      const query: UserQueryDto = {};
-
-      const expectedResult = {
-        records: expect.any([User]) as User[],
-        page: expect.any(Number) as number,
-        totalPages: expect.any(Number) as number,
-        totalRecords: expect.any(Number) as number,
-      };
-
-      mockFindUsersUseCase.run.mockResolvedValue(expectedResult);
-
-      //Act
-      const result = await controller.getUsers(query);
-
-      //Assert
-      expect(mockFindUsersUseCase.run).toHaveBeenCalledTimes(1);
-      expect(mockFindUsersUseCase.run).toHaveBeenCalledWith(query);
       expect(result).toBe(expectedResult);
     });
   });

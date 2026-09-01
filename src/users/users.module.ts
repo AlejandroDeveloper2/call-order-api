@@ -14,7 +14,6 @@ import {
   PostgresPermissionSchema,
   PostgresRolePermissionSchema,
 } from './infrastructure/persistence/postgres/schemas';
-import { PostgresAccountSchema } from '../auth/infrastructure/persistence/postgres/schemas';
 
 /** Módulos */
 import { SharedModule } from '../shared/shared.module';
@@ -30,7 +29,6 @@ import {
     SharedModule,
     TypeOrmModule.forFeature([
       PostgresUserSchema,
-      PostgresAccountSchema,
       PostgresRoleSchema,
       PostgresPermissionSchema,
       PostgresRolePermissionSchema,
