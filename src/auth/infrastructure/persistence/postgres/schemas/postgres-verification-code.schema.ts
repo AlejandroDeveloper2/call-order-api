@@ -36,7 +36,11 @@ export class PostgresVerificationCodeSchema {
   @Column({ length: 64 })
   codeLookup!: string;
 
-  @Column({ enum: ['double-factor'], default: 'double-factor' })
+  @Column({
+    type: 'varchar',
+    enum: ['double-factor'],
+    default: 'double-factor',
+  })
   type!: VerificationCodeType;
 
   @Column({ type: 'timestamptz', nullable: false })

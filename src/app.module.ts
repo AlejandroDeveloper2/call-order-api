@@ -38,7 +38,10 @@ import {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath:
+        process.env.NODE_ENV === 'production'
+          ? '.env'
+          : `.env.${process.env.NODE_ENV || 'development'}`,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -59,7 +62,7 @@ import {
           PostgresSessionSchema,
           PostgresVerificationCodeSchema,
         ],
-        synchronize: false,
+        synchronize: true,
         retryAttempts: 3,
         retryDelay: 2000,
         connectTimeoutMS: 5000,

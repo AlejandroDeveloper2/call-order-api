@@ -3,8 +3,10 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: call-order-db
+      POSTGRES_DB: call-order-db_test
       POSTGRES_USER: postgres
+    ports:
+      - '5433:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
@@ -19,4 +21,9 @@ services:
       NODE_ENV: test
       DB_HOST: db
       DB_PORT: 5432
-    # No depende de 'up', solo de 'run'
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: call-order-db_test
+    depends_on:
+      db:
+        condition: service_healthy
