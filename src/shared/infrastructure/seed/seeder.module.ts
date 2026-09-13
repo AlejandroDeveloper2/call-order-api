@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 /** Seeders */
 import { AccountSeeder } from './account.seeder';
 import { RolesSeeder } from './roles.seeder';
+import { VerificationCodesSeeder } from './verification-codes.seeder';
 
 /** Esquemas */
 import {
@@ -31,7 +32,7 @@ import {
       PostgresVerificationCodeSchema,
     ]),
   ],
-  providers: [AccountSeeder, RolesSeeder],
+  providers: [AccountSeeder, RolesSeeder, VerificationCodesSeeder],
   exports: [],
 })
 export class SeederModule {}
