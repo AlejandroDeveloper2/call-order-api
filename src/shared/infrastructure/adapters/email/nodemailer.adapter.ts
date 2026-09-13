@@ -2,9 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
-import { EmailSenderPort } from '../../domain/ports/email-sender.port';
+import { EmailSenderPort } from '../../../domain/ports/email-sender.port';
 
-import { EmailSenderException } from '../exceptions';
+import { EmailSenderException } from '../../exceptions';
+
+import { getIdentityValidationEmailTemplate } from './templates/identity-validation-email.template';
+
+const templates = (content: string, template: 'identityValidation') =>
+  ({
+    identityValidation: getIdentityValidationEmailTemplate(content),
+  })[template];
 
 @Injectable()
 export class NodeMailerAdapter implements EmailSenderPort {
@@ -22,13 +29,18 @@ export class NodeMailerAdapter implements EmailSenderPort {
     });
   }
 
-  async sendEmail(to: string, subject: string, body: string): Promise<void> {
+  async sendEmail(
+    to: string,
+    subject: string,
+    body: string,
+    template: 'identityValidation' = 'identityValidation',
+  ): Promise<void> {
     try {
       await this.transporter.sendMail({
         from: '"CallOrder" <diegodiazdev9817@gmail.com>',
         to,
         subject,
-        html: body,
+        html: templates(body, template),
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

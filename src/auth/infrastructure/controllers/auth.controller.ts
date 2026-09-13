@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -65,12 +67,14 @@ export class AuthController {
   }
 
   @Post('/login')
+  @HttpCode(HttpStatus.OK)
   @ApiMessage('Credenciales verificadas correctamente')
   postLogin(@Body() loginDto: LoginDto) {
     return this.loginUseCase.run(loginDto);
   }
 
   @Post('/validate')
+  @HttpCode(HttpStatus.OK)
   @ApiMessage('Identidad verificada con éxito')
   async postValidateIdentity(
     @Res({ passthrough: true }) res: Response,
@@ -91,7 +95,7 @@ export class AuthController {
   }
 
   @Post('/register')
-  // @Auth('auth:create:account')
+  @Auth('auth:create:account')
   @ApiMessage('Cuenta creada con éxito')
   postCreateAccount(@Body() createAccountDto: CreateAccountDto) {
     return this.createAccountUseCase.run(createAccountDto);

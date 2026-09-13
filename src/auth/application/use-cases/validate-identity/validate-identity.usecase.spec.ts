@@ -8,6 +8,7 @@ import {
 import {
   AccessTokenGeneratorPort,
   AccountRepositoryPort,
+  EncryptorPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
   TokenHasherPort,
@@ -39,6 +40,7 @@ type SessionRepositoryMock = Pick<
 type TransactionManagerMock = Pick<TransactionManagerPort, 'run'>;
 type IdGeneratorMock = Pick<IdGeneratorPort, 'generate'>;
 type TokenHasherMock = Pick<TokenHasherPort, 'compare' | 'hash'>;
+type EncryptorMock = Pick<EncryptorPort, 'compare'>;
 type AccessTokenGeneratorMock = Pick<AccessTokenGeneratorPort, 'generate'>;
 type RefreshTokenGeneratorMock = Pick<RefreshTokenGeneratorPort, 'generate'>;
 type VerificationCodeLookupMock = Pick<
@@ -55,6 +57,7 @@ describe('ValidateIdentityUseCase', () => {
   let transactionManagerMock: jest.Mocked<TransactionManagerMock>;
   let idGeneratorMock: jest.Mocked<IdGeneratorMock>;
   let tokenHasherMock: jest.Mocked<TokenHasherMock>;
+  let encryptorMock: jest.Mocked<EncryptorMock>;
   let accessTokenGeneratorMock: jest.Mocked<AccessTokenGeneratorMock>;
   let refreshTokenGeneratorMock: jest.Mocked<RefreshTokenGeneratorMock>;
   let verificationCodeLookupMock: jest.Mocked<VerificationCodeLookupMock>;
@@ -125,6 +128,10 @@ describe('ValidateIdentityUseCase', () => {
       compare: jest.fn(),
     };
 
+    encryptorMock = {
+      compare: jest.fn(),
+    };
+
     accessTokenGeneratorMock = {
       generate: jest.fn(),
     };
@@ -149,6 +156,7 @@ describe('ValidateIdentityUseCase', () => {
       transactionManagerMock,
       idGeneratorMock,
       tokenHasherMock,
+      encryptorMock as unknown as EncryptorPort,
       accessTokenGeneratorMock,
       refreshTokenGeneratorMock,
       verificationCodeLookupMock,
@@ -180,7 +188,7 @@ describe('ValidateIdentityUseCase', () => {
         verificationCode,
       );
 
-      tokenHasherMock.compare.mockReturnValue(true);
+      encryptorMock.compare.mockResolvedValue(true);
 
       dateHandlerMock.isAfter.mockReturnValue(false);
 
@@ -217,7 +225,7 @@ describe('ValidateIdentityUseCase', () => {
         verificationCodeRepositoryMock.findForIdentityValidation,
       ).toHaveBeenCalledWith(command.email, codeLookup);
 
-      expect(tokenHasherMock.compare).toHaveBeenCalledWith(
+      expect(encryptorMock.compare).toHaveBeenCalledWith(
         command.verificationCode,
         verificationCode.codeHash,
       );
@@ -262,7 +270,7 @@ describe('ValidateIdentityUseCase', () => {
       // Assert
       await expect(promise).rejects.toBeInstanceOf(InvalidCodeException);
 
-      expect(tokenHasherMock.compare).not.toHaveBeenCalled();
+      expect(encryptorMock.compare).not.toHaveBeenCalled();
 
       expect(accessTokenGeneratorMock.generate).not.toHaveBeenCalled();
 
@@ -279,7 +287,7 @@ describe('ValidateIdentityUseCase', () => {
         verificationCode,
       );
 
-      tokenHasherMock.compare.mockReturnValue(false);
+      encryptorMock.compare.mockResolvedValue(false);
 
       // Act
       const promise = useCase.run(command);
@@ -304,7 +312,7 @@ describe('ValidateIdentityUseCase', () => {
         verificationCode,
       );
 
-      tokenHasherMock.compare.mockReturnValue(true);
+      encryptorMock.compare.mockResolvedValue(true);
 
       dateHandlerMock.isAfter.mockReturnValue(true);
 
@@ -336,7 +344,7 @@ describe('ValidateIdentityUseCase', () => {
         verificationCode,
       );
 
-      tokenHasherMock.compare.mockReturnValue(true);
+      encryptorMock.compare.mockResolvedValue(true);
 
       dateHandlerMock.isAfter.mockReturnValue(false);
 
@@ -384,7 +392,7 @@ describe('ValidateIdentityUseCase', () => {
         verificationCode,
       );
 
-      tokenHasherMock.compare.mockReturnValue(true);
+      encryptorMock.compare.mockResolvedValue(true);
 
       dateHandlerMock.isAfter.mockReturnValue(false);
 

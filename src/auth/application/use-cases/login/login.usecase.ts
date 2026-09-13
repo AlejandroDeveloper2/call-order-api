@@ -145,15 +145,7 @@ export class LoginUseCase {
     await this.emailSender.sendEmail(
       account.email,
       'Código de verificación de CallOrder',
-      this.buildVerificationEmail(code.toString()),
+      code.toString(),
     );
-  }
-
-  private buildVerificationEmail(code: string): string {
-    return `
-      <p>Tu código de verificación es:</p>
-      <p><strong>${code}</strong></p>
-      <p>Este código expirará en 10 minutos.</p>
-    `;
   }
 }

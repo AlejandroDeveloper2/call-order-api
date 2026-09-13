@@ -5,6 +5,7 @@ import { Session } from '../../../domain/entities';
 import {
   AccessTokenGeneratorPort,
   AccountRepositoryPort,
+  EncryptorPort,
   RefreshTokenGeneratorPort,
   SessionRepositoryPort,
   TokenHasherPort,
@@ -43,6 +44,7 @@ export class ValidateIdentityUseCase {
     private readonly transactionManager: TransactionManagerPort,
     private readonly idGenerator: IdGeneratorPort,
     private readonly tokenHasher: TokenHasherPort,
+    private readonly encryptor: EncryptorPort,
     private readonly accessTokenGenerator: AccessTokenGeneratorPort,
     private readonly refreshTokenGenerator: RefreshTokenGeneratorPort,
     private readonly verificationCodeLookup: VerificationCodeLookupPort,
@@ -72,7 +74,7 @@ export class ValidateIdentityUseCase {
       throw new InvalidCodeException('Código de verificación invalido');
 
     /** Comparar el hash del código para filtrar el código de verificación actual */
-    const isValid = this.tokenHasher.compare(
+    const isValid = await this.encryptor.compare(
       codeValue.toString(),
       verificationCode.codeHash,
     );
