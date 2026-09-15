@@ -1,14 +1,14 @@
 import { applyDecorators, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 
 /** Guards */
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { PermissionsGuard } from '../guards/permissions.guard';
 /** Decoradores */
 import { Permissions } from './permissions.decorator';
 
 export function Auth(...permissions: string[]) {
   return applyDecorators(
-    UseGuards(AuthGuard('jwt'), PermissionsGuard),
+    UseGuards(JwtAuthGuard, PermissionsGuard),
     Permissions(...permissions),
   );
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { PassportStrategy, IAuthModuleOptions } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -9,7 +9,11 @@ import { TokenExpiredError } from 'jsonwebtoken';
 import { AccessTokenPayload } from '../../domain/types';
 
 /** Errores */
-import { ExpiredTokenException, MalformedTokenException } from '../exceptions';
+import {
+  ExpiredTokenException,
+  MalformedTokenException,
+  MissingTokenException,
+} from '../exceptions';
 
 /** Caso de uso */
 import { ValidateAccessTokenUseCase } from '../../application/use-cases';
@@ -40,18 +44,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     err: Error | null | false,
     user: TUser,
     info: unknown,
+    context: ExecutionContext,
   ): TUser {
+    const request = context.switchToHttp().getRequest<Request>();
+
+    if (!request.headers.authorization) {
+      throw new MissingTokenException('Token no proporcionado');
+    }
+
     if (info instanceof TokenExpiredError) {
       throw new ExpiredTokenException('El token de sesión ha expirado');
     }
 
     if (err || !user) {
-      throw (
-        (err as Error) ??
-        new MalformedTokenException(
-          'Token de sesión malformdo o no proporcionado',
-        )
-      );
+      throw new MalformedTokenException('Token de sesión malformado');
     }
 
     return user;

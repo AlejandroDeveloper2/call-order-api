@@ -11,7 +11,7 @@ import { Reflector } from '@nestjs/core';
 
 import { ApiResponse } from '../../domain/types';
 
-import { API_MESSAGE_KEY } from '../decorators';
+import { API_MESSAGE_KEY } from '../decorators/api-message.decorator';
 
 @Injectable()
 export class ApiResponseInterceptor<T> implements NestInterceptor<

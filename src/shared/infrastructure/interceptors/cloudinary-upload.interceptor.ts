@@ -15,7 +15,7 @@ import { FILE_UPLOADER } from '../../domain/ports';
 import { FileNotProvidedException, FileUploadException } from '../exceptions';
 
 /** Adpatadores */
-import { CloudinaryAdpater } from '../adapters';
+import { CloudinaryAdpater } from '../adapters/cloudinary.adapter';
 
 interface RequestWithFile extends Express.Request {
   file: Express.Multer.File;

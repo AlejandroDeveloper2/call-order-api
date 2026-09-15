@@ -102,12 +102,14 @@ export class AuthController {
   }
 
   @Post('/resend/code')
+  @HttpCode(HttpStatus.OK)
   @ApiMessage('Código reenviado con éxito')
   postResendCode(@Body() resendCodeDto: ResendCodeDto) {
     return this.resendCodeUseCase.run(resendCodeDto);
   }
 
   @Post('/logout')
+  @HttpCode(HttpStatus.OK)
   @Auth()
   @ApiMessage('Sesión cerrada con éxito')
   async postLogout(
@@ -128,12 +130,13 @@ export class AuthController {
   }
 
   @Post('/refresh')
+  @HttpCode(HttpStatus.OK)
   @Auth()
   @ApiMessage('Sesión actualizada con éxito')
   async postRefreshSession(
     @Res({ passthrough: true }) res: Response,
     @BearerToken() oldToken: string,
-    @Cookie() oldRefreshToken: string,
+    @Cookie('refresh_token') oldRefreshToken: string,
     @GetAccount('accountId', ParseUUIDPipe) accountId: string,
   ) {
     const { token, refreshToken } = await this.refreshSessionUseCase.run(

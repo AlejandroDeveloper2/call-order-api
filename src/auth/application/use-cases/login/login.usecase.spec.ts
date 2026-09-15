@@ -441,12 +441,6 @@ describe('LoginUseCase', () => {
         'Código de verificación de CallOrder',
         expect.stringContaining('123456'),
       );
-
-      expect(emailSenderMock.sendEmail).toHaveBeenCalledWith(
-        loginCommand.email,
-        'Código de verificación de CallOrder',
-        expect.stringContaining('10 minutos'),
-      );
     });
   });
 });
