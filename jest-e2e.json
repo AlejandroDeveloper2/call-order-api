@@ -4,10 +4,11 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "maxWorkers": 1,
-  "setupFiles": ["<rootDir>/setup/env.setup.ts"],
+  "setupFiles": ["./test/setup/env.setup.ts"],
   "transform": {
     "^.+\\.(t|j)s$": ["ts-jest", { "useESM": true }]
   },
   "transformIgnorePatterns": ["node_modules/(?!(uuid)/)"],
-  "extensionsToTreatAsEsm": [".ts"]
+  "extensionsToTreatAsEsm": [".ts"],
+  "coverageDirectory": "./coverage-e2e"
 }

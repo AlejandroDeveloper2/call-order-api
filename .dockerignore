@@ -5,6 +5,7 @@ dist
 .env.*
 !.env.example
 coverage
+coverage-e2e
 .eslintrc.js
 .prettierrc
 docker-compose*.yml
