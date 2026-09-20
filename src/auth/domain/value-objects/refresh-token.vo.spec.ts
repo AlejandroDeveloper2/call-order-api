@@ -1,6 +1,6 @@
-import { InvalidRefreshTokenException } from '../../exceptions';
+import { InvalidRefreshTokenException } from '../exceptions';
 
-import { RefreshToken } from '../refresh-token.vo';
+import { RefreshToken } from './refresh-token.vo';
 
 describe('refreshTokenVo', () => {
   describe('create', () => {

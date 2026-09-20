@@ -19,10 +19,6 @@ export class RefreshToken {
     return new RefreshToken(normalized);
   }
 
-  equals(other: RefreshToken): boolean {
-    return this.value === other.value;
-  }
-
   private static isValid(value: string): boolean {
     return /^[a-f0-9]{128}$/i.test(value);
   }

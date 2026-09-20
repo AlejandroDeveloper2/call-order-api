@@ -94,7 +94,6 @@
       "!**/*.module.ts",
       "!**/*.schema.ts",
       "!**/*.dto.ts",
-      "!**/*.entity.ts",
       "!**/*.seeder.ts",
       "!**/*.providers.ts",
       "!**/ports/**/*.ts",

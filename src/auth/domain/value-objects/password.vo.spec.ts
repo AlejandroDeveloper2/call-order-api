@@ -1,6 +1,6 @@
-import { InvalidPasswordException } from '../../exceptions';
+import { InvalidPasswordException } from '../exceptions';
 
-import { Password } from '../password.vo';
+import { Password } from './password.vo';
 
 describe('passwordVo', () => {
   describe('create', () => {

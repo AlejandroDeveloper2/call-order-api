@@ -1,6 +1,6 @@
-import { InvalidEmailException } from '../../exceptions';
+import { InvalidEmailException } from '../exceptions';
 
-import { Email } from '../email.vo';
+import { Email } from './email.vo';
 
 describe('emailVo', () => {
   describe('create', () => {

@@ -1,6 +1,6 @@
-import { InvalidCodeFormatException } from '../../exceptions';
+import { InvalidCodeFormatException } from '../exceptions';
 
-import { Code } from '../code.vo';
+import { Code } from './code.vo';
 
 describe('CodeVo', () => {
   describe('create', () => {
