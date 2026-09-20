@@ -2,30 +2,44 @@ import { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TokenExpiredError } from 'jsonwebtoken';
 
+/** Casos de uso */
 import { ValidateAccessTokenUseCase } from '../../application/use-cases';
 
+/** Excepciones */
 import {
   ExpiredTokenException,
   MalformedTokenException,
   MissingTokenException,
 } from '../exceptions';
 
+/** Estrategias */
 import { JwtStrategy } from './jwt.strategy';
 
-describe('JwtStrategy', () => {
-  const createStrategy = () => {
-    const configService = {
-      get: jest.fn().mockReturnValue('test-secret'),
-    } as unknown as ConfigService;
-    const validateAccessTokenUseCase = {
-      run: jest.fn(),
-    } as unknown as ValidateAccessTokenUseCase;
+type ConfigServiceMock = Pick<ConfigService, 'get'>;
+type ValidateAccessTokenUseCaseMock = Pick<ValidateAccessTokenUseCase, 'run'>;
 
-    return {
-      strategy: new JwtStrategy(configService, validateAccessTokenUseCase),
-      validateAccessTokenUseCase,
+describe('JwtStrategy', () => {
+  let configServiceMock: jest.Mocked<ConfigServiceMock>;
+  let validateAccessTokenUseCaseMock: jest.Mocked<ValidateAccessTokenUseCaseMock>;
+  let strategy: JwtStrategy;
+
+  beforeEach(() => {
+    configServiceMock = {
+      get: jest.fn().mockReturnValue('test-secret'),
     };
-  };
+    validateAccessTokenUseCaseMock = {
+      run: jest.fn(),
+    };
+
+    strategy = new JwtStrategy(
+      configServiceMock as unknown as ConfigService,
+      validateAccessTokenUseCaseMock as unknown as ValidateAccessTokenUseCase,
+    );
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
 
   const createContext = (authorization?: string) =>
     ({
@@ -36,11 +50,10 @@ describe('JwtStrategy', () => {
 
   it('deberia lanzar MissingTokenException cuando no existe Authorization', () => {
     // Arrange
-    const { strategy } = createStrategy();
+    const context = createContext();
 
     // Act
-    const result = () =>
-      strategy.handleRequest(null, {} as never, null, createContext());
+    const result = () => strategy.handleRequest(null, {}, null, context);
 
     // Assert
     expect(result).toThrow(MissingTokenException);
@@ -48,17 +61,12 @@ describe('JwtStrategy', () => {
 
   it('deberia lanzar ExpiredTokenException cuando el token expiro', () => {
     // Arrange
-    const { strategy } = createStrategy();
+    const context = createContext('Bearer expired-token');
     const expirationError = new TokenExpiredError('jwt expired', new Date());
 
     // Act
     const result = () =>
-      strategy.handleRequest(
-        null,
-        {} as never,
-        expirationError,
-        createContext('Bearer expired-token'),
-      );
+      strategy.handleRequest(null, {}, expirationError, context);
 
     // Assert
     expect(result).toThrow(ExpiredTokenException);
@@ -66,16 +74,11 @@ describe('JwtStrategy', () => {
 
   it('deberia lanzar MalformedTokenException cuando Passport informa un error', () => {
     // Arrange
-    const { strategy } = createStrategy();
+    const context = createContext('Bearer malformed-token');
 
     // Act
     const result = () =>
-      strategy.handleRequest(
-        new Error('invalid token'),
-        false,
-        null,
-        createContext('Bearer malformed-token'),
-      );
+      strategy.handleRequest(new Error('invalid token'), false, null, context);
 
     // Assert
     expect(result).toThrow(MalformedTokenException);
@@ -83,16 +86,11 @@ describe('JwtStrategy', () => {
 
   it('deberia devolver el usuario cuando el token es valido', () => {
     // Arrange
-    const { strategy } = createStrategy();
+    const context = createContext('Bearer valid-token');
     const user = { accountId: 'account-id' };
 
     // Act
-    const result = strategy.handleRequest(
-      null,
-      user,
-      null,
-      createContext('Bearer valid-token'),
-    );
+    const result = strategy.handleRequest(null, user, null, context);
 
     // Assert
     expect(result).toBe(user);
@@ -100,14 +98,13 @@ describe('JwtStrategy', () => {
 
   it('deberia delegar la validacion del payload al caso de uso', async () => {
     // Arrange
-    const { strategy, validateAccessTokenUseCase } = createStrategy();
     const payload = {
       accountId: 'account-id',
       roleId: 'role-id',
       profileId: 'profile-id',
       permissions: [],
     };
-    const runMock = jest.spyOn(validateAccessTokenUseCase, 'run');
+    const runMock = jest.spyOn(validateAccessTokenUseCaseMock, 'run');
     runMock.mockResolvedValue(payload);
 
     // Act
