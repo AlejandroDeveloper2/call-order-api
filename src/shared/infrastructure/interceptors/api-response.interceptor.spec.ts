@@ -1,24 +1,48 @@
 import { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { HttpArgumentsHost } from '@nestjs/common/interfaces';
 import { firstValueFrom, of } from 'rxjs';
 
 import { API_MESSAGE_KEY } from '../decorators';
+
 import { ApiResponseInterceptor } from './api-response.interceptor';
 
+type ReflectorMock = jest.Mocked<Pick<Reflector, 'get'>>;
+type ExecutionContextMock = jest.Mocked<
+  Pick<ExecutionContext, 'getHandler' | 'switchToHttp'>
+>;
+type HttpArgumentsHostMock = jest.Mocked<
+  Pick<HttpArgumentsHost, 'getResponse'>
+>;
+
 describe('ApiResponseInterceptor', () => {
-  const createContext = (statusCode: number) => {
-    const reflector = {
+  let reflectorMock: ReflectorMock;
+  let executionContextMock: ExecutionContextMock;
+  let httpArgumentsHostMock: HttpArgumentsHostMock;
+
+  beforeEach(() => {
+    reflectorMock = {
       get: jest.fn(),
     };
-    const context = {
-      getHandler: jest.fn(),
-      switchToHttp: () => ({
-        getResponse: () => ({ statusCode }),
-      }),
+    httpArgumentsHostMock = {
+      getResponse: jest.fn(),
     };
+    executionContextMock = {
+      getHandler: jest.fn(),
+      switchToHttp: jest.fn().mockReturnValue(httpArgumentsHostMock),
+    };
+    jest.clearAllMocks();
+  });
+
+  const createContext = (statusCode: number) => {
+    httpArgumentsHostMock.getResponse.mockReturnValue({ statusCode });
+    executionContextMock.switchToHttp.mockReturnValue(
+      httpArgumentsHostMock as unknown as HttpArgumentsHost,
+    );
 
     return {
-      context: context as unknown as ExecutionContext,
-      reflector,
+      context: executionContextMock as unknown as ExecutionContext,
+      reflector: reflectorMock,
     };
   };
 
@@ -26,13 +50,13 @@ describe('ApiResponseInterceptor', () => {
     // Arrange
     const { context, reflector } = createContext(201);
     reflector.get.mockReturnValue('Registro creado');
-    const interceptor = new ApiResponseInterceptor(reflector as never);
+    const interceptor = new ApiResponseInterceptor(
+      reflector as unknown as Reflector,
+    );
     const next = { handle: () => of({ id: 'record-id' }) };
 
     // Act
-    const result = await firstValueFrom(
-      interceptor.intercept(context, next as never),
-    );
+    const result = await firstValueFrom(interceptor.intercept(context, next));
 
     // Assert
     expect(reflector.get).toHaveBeenCalledWith(API_MESSAGE_KEY, undefined);
@@ -47,13 +71,13 @@ describe('ApiResponseInterceptor', () => {
     // Arrange
     const { context, reflector } = createContext(200);
     reflector.get.mockReturnValue(undefined);
-    const interceptor = new ApiResponseInterceptor(reflector as never);
+    const interceptor = new ApiResponseInterceptor(
+      reflector as unknown as Reflector,
+    );
     const next = { handle: () => of('ok') };
 
     // Act
-    const result = await firstValueFrom(
-      interceptor.intercept(context, next as never),
-    );
+    const result = await firstValueFrom(interceptor.intercept(context, next));
 
     // Assert
     expect(result).toEqual({ data: 'ok', message: 'Success', httpCode: 200 });

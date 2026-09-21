@@ -1,34 +1,69 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
+
+import { EmailSenderException } from '../../exceptions';
+
+import { getIdentityValidationEmailTemplate } from './templates/identity-validation-email.template';
+
+import { NodeMailerAdapter } from './nodemailer.adapter';
+
+type NodeMailerMock = jest.Mocked<typeof nodemailer>;
+type ConfigServiceMock = Pick<ConfigService, 'get'>;
+
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
 }));
 
-import * as nodemailer from 'nodemailer';
-import { ConfigService } from '@nestjs/config';
-
-import { EmailSenderException } from '../../exceptions';
-import { getIdentityValidationEmailTemplate } from './templates/identity-validation-email.template';
-import { NodeMailerAdapter } from './nodemailer.adapter';
-
 describe('NodeMailerAdapter', () => {
-  let sendMail: jest.Mock;
-  let configService: ConfigService;
+  let sendMailMock: jest.MockedFunction<nodemailer.Transporter['sendMail']>;
+  let configServiceMock: jest.Mocked<ConfigServiceMock>;
+  let nodeMailerMock: NodeMailerMock;
 
   beforeEach(() => {
-    sendMail = jest.fn().mockResolvedValue(undefined);
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail });
-    configService = {
-      get: jest.fn((key: string) =>
-        key === 'NODE_MAILER_USER' ? 'smtp-user' : 'smtp-password',
-      ),
-    } as unknown as ConfigService;
+    sendMailMock = jest
+      .fn()
+      .mockResolvedValue(undefined) as jest.MockedFunction<
+      nodemailer.Transporter['sendMail']
+    >;
+
+    nodeMailerMock = nodemailer as NodeMailerMock;
+    nodeMailerMock.createTransport.mockReturnValue({
+      sendMail: sendMailMock,
+    } as unknown as nodemailer.Transporter);
+
+    configServiceMock = {
+      get: jest.fn((key: string) => {
+        if (key === 'NODE_MAILER_USER') {
+          return 'smtp-user';
+        }
+
+        if (key === 'NODE_MAILER_PASSWORD') {
+          return 'smtp-password';
+        }
+
+        return undefined;
+      }),
+    } as unknown as jest.Mocked<ConfigServiceMock>;
+
+    jest.clearAllMocks();
+
+    nodeMailerMock.createTransport.mockReturnValue({
+      sendMail: sendMailMock,
+    } as unknown as nodemailer.Transporter);
   });
 
   it('deberia configurar el transporter SMTP con las credenciales', () => {
     // Arrange
-    new NodeMailerAdapter(configService);
+    new NodeMailerAdapter(configServiceMock as unknown as ConfigService);
 
     // Act
-    const result = (nodemailer.createTransport as jest.Mock).mock.calls[0][0];
+    const result = nodeMailerMock.createTransport.mock.calls[0][0] as {
+      host: string;
+      port: number;
+      secure: boolean;
+      auth: { user: string; pass: string };
+    };
 
     // Assert
     expect(result).toEqual({
@@ -41,13 +76,15 @@ describe('NodeMailerAdapter', () => {
 
   it('deberia enviar un correo con la plantilla de validacion', async () => {
     // Arrange
-    const adapter = new NodeMailerAdapter(configService);
+    const adapter = new NodeMailerAdapter(
+      configServiceMock as unknown as ConfigService,
+    );
 
     // Act
     await adapter.sendEmail('john@example.com', 'Validacion', '123456');
 
     // Assert
-    expect(sendMail).toHaveBeenCalledWith({
+    expect(sendMailMock).toHaveBeenCalledWith({
       from: '"CallOrder" <diegodiazdev9817@gmail.com>',
       to: 'john@example.com',
       subject: 'Validacion',
@@ -57,8 +94,10 @@ describe('NodeMailerAdapter', () => {
 
   it('deberia convertir errores Error en EmailSenderException', async () => {
     // Arrange
-    sendMail.mockRejectedValue(new Error('SMTP unavailable'));
-    const adapter = new NodeMailerAdapter(configService);
+    sendMailMock.mockRejectedValue(new Error('SMTP unavailable'));
+    const adapter = new NodeMailerAdapter(
+      configServiceMock as unknown as ConfigService,
+    );
 
     // Act
     const result = adapter.sendEmail('john@example.com', 'Subject', 'Body');
@@ -72,8 +111,10 @@ describe('NodeMailerAdapter', () => {
 
   it('deberia convertir errores no Error a texto', async () => {
     // Arrange
-    sendMail.mockRejectedValue('SMTP unavailable');
-    const adapter = new NodeMailerAdapter(configService);
+    sendMailMock.mockRejectedValue('SMTP unavailable');
+    const adapter = new NodeMailerAdapter(
+      configServiceMock as unknown as ConfigService,
+    );
 
     // Act
     const result = adapter.sendEmail('john@example.com', 'Subject', 'Body');

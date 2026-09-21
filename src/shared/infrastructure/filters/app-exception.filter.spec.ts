@@ -1,25 +1,46 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, HttpArgumentsHost } from '@nestjs/common/interfaces';
 
 import { InvalidEmailException } from '../../../auth/domain/exceptions';
 import { AccountNotFoundException } from '../../../auth/application/exceptions';
 import { FileUploadException } from '../exceptions';
+
 import { AppExceptionFilter } from './app-exception.filter';
 
+type ArgumentsHostMock = jest.Mocked<Pick<ArgumentsHost, 'switchToHttp'>>;
+type HttpArgumentsHostMock = jest.Mocked<
+  Pick<HttpArgumentsHost, 'getRequest' | 'getResponse'>
+>;
+
 describe('AppExceptionFilter', () => {
+  let argumentsHostMock: ArgumentsHostMock;
+  let httpArgumentsHostMock: HttpArgumentsHostMock;
+
+  beforeEach(() => {
+    httpArgumentsHostMock = {
+      getResponse: jest.fn(),
+      getRequest: jest.fn(),
+    };
+    argumentsHostMock = {
+      switchToHttp: jest.fn().mockReturnValue(httpArgumentsHostMock),
+    };
+
+    jest.clearAllMocks();
+  });
+
   const createHost = (url = '/api/test') => {
     const response = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
     };
+    httpArgumentsHostMock.getResponse.mockReturnValue(response);
+    httpArgumentsHostMock.getRequest.mockReturnValue({ url });
 
-    const host = {
-      switchToHttp: () => ({
-        getResponse: () => response,
-        getRequest: () => ({ url }),
-      }),
-    };
+    argumentsHostMock.switchToHttp.mockReturnValue(
+      httpArgumentsHostMock as unknown as HttpArgumentsHost,
+    );
 
-    return { host: host as never, response };
+    return { host: argumentsHostMock, response };
   };
 
   it('deberia convertir una excepcion de dominio al contrato de error', () => {
@@ -29,7 +50,7 @@ describe('AppExceptionFilter', () => {
     const exception = new InvalidEmailException('Correo inválido');
 
     // Act
-    filter.catch(exception, host);
+    filter.catch(exception, host as unknown as ArgumentsHost);
 
     // Assert
     expect(response.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
@@ -52,7 +73,7 @@ describe('AppExceptionFilter', () => {
     const exception = new AccountNotFoundException('Cuenta no encontrada');
 
     // Act
-    filter.catch(exception, host);
+    filter.catch(exception, host as unknown as ArgumentsHost);
 
     // Assert
     expect(response.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
@@ -70,7 +91,7 @@ describe('AppExceptionFilter', () => {
     );
 
     // Act
-    filter.catch(exception, host);
+    filter.catch(exception, host as unknown as ArgumentsHost);
 
     // Assert
     expect(response.status).toHaveBeenCalledWith(HttpStatus.FAILED_DEPENDENCY);
@@ -89,7 +110,7 @@ describe('AppExceptionFilter', () => {
     );
 
     // Act
-    filter.catch(exception, host);
+    filter.catch(exception, host as unknown as ArgumentsHost);
 
     // Assert
     expect(response.status).toHaveBeenCalledWith(HttpStatus.UNAUTHORIZED);
@@ -108,7 +129,10 @@ describe('AppExceptionFilter', () => {
     const { host, response } = createHost();
 
     // Act
-    filter.catch(new Error('Error inesperado'), host);
+    filter.catch(
+      new Error('Error inesperado'),
+      host as unknown as ArgumentsHost,
+    );
 
     // Assert
     expect(response.status).toHaveBeenCalledWith(

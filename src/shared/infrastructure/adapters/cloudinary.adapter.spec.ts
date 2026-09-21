@@ -1,3 +1,10 @@
+import { v2 as cloudinary } from 'cloudinary';
+import { createReadStream } from 'streamifier';
+
+import { FileUploadException } from '../exceptions';
+
+import { CloudinaryAdpater } from './cloudinary.adapter';
+
 jest.mock('cloudinary', () => ({
   v2: {
     config: jest.fn(),
@@ -8,15 +15,46 @@ jest.mock('streamifier', () => ({
   createReadStream: jest.fn(),
 }));
 
-import { v2 as cloudinary } from 'cloudinary';
-import { createReadStream } from 'streamifier';
+type UploadStreamCallback = (
+  error: Error | null,
+  result?: Record<string, unknown>,
+) => void;
 
-import { FileUploadException } from '../exceptions';
+type UploadStreamMock = jest.MockedFunction<
+  (options: { folder: string }, callback: UploadStreamCallback) => unknown
+>;
 
-import { CloudinaryAdpater } from './cloudinary.adapter';
+type CloudinaryMock = {
+  config: jest.MockedFunction<typeof cloudinary.config>;
+  uploader: {
+    upload_stream: UploadStreamMock;
+  };
+};
 
 describe('CloudinaryAdpater', () => {
+  let cloudinaryMock: CloudinaryMock;
+  let createReadStreamMock: jest.MockedFunction<typeof createReadStream>;
+
+  const uploadResult = { secure_url: 'https://image.test/file.png' };
+
   beforeEach(() => {
+    cloudinaryMock = {
+      config: jest.fn() as jest.MockedFunction<typeof cloudinary.config>,
+      uploader: {
+        upload_stream: jest.fn() as UploadStreamMock,
+      },
+    };
+
+    cloudinary.config = cloudinaryMock.config;
+    cloudinary.uploader =
+      cloudinaryMock.uploader as unknown as typeof cloudinary.uploader;
+    createReadStreamMock = jest.fn() as jest.MockedFunction<
+      typeof createReadStream
+    >;
+
+    (createReadStream as jest.MockedFunction<typeof createReadStream>) =
+      createReadStreamMock;
+
     jest.clearAllMocks();
     process.env.CLOUDINARY_CLOUD_NAME = 'cloud-name';
     process.env.CLOUDINARY_API_KEY = 'api-key';
@@ -28,11 +66,7 @@ describe('CloudinaryAdpater', () => {
     new CloudinaryAdpater();
 
     // Act
-    const config = (
-      (cloudinary.config as jest.Mock).mock.calls as unknown as [
-        Record<string, string>,
-      ][]
-    )[0][0];
+    const config = cloudinaryMock.config.mock.calls[0][0];
 
     // Assert
     expect(config).toEqual({
@@ -45,10 +79,13 @@ describe('CloudinaryAdpater', () => {
   it('deberia subir el archivo en la carpeta indicada y resolver el resultado', async () => {
     // Arrange
     const stream = { pipe: jest.fn() };
-    const uploadResult = { secure_url: 'https://image.test/file.png' };
-    (createReadStream as jest.Mock).mockReturnValue(stream);
-    (cloudinary.uploader.upload_stream as jest.Mock).mockImplementation(
-      (_options: unknown, callback: (error: null, result: object) => void) => {
+    createReadStreamMock.mockReturnValue(
+      stream as unknown as ReturnType<typeof createReadStream>,
+    );
+
+    cloudinaryMock.uploader.upload_stream.mockImplementation(
+      (options: { folder: string }, callback: UploadStreamCallback) => {
+        expect(options).toEqual({ folder: 'documents' });
         callback(null, uploadResult);
         return { upload: jest.fn() };
       },
@@ -72,9 +109,12 @@ describe('CloudinaryAdpater', () => {
   it('deberia usar avatars como carpeta por defecto', async () => {
     // Arrange
     const stream = { pipe: jest.fn() };
-    (createReadStream as jest.Mock).mockReturnValue(stream);
-    (cloudinary.uploader.upload_stream as jest.Mock).mockImplementation(
-      (_options: unknown, callback: (error: null, result: object) => void) => {
+    createReadStreamMock.mockReturnValue(
+      stream as unknown as ReturnType<typeof createReadStream>,
+    );
+    cloudinaryMock.uploader.upload_stream.mockImplementation(
+      (options: { folder: string }, callback: UploadStreamCallback) => {
+        expect(options).toEqual({ folder: 'avatars' });
         callback(null, {});
         return {};
       },
@@ -96,12 +136,12 @@ describe('CloudinaryAdpater', () => {
   it('deberia rechazar con FileUploadException cuando Cloudinary devuelve error', async () => {
     // Arrange
     const stream = { pipe: jest.fn() };
-    (createReadStream as jest.Mock).mockReturnValue(stream);
-    (cloudinary.uploader.upload_stream as jest.Mock).mockImplementation(
-      (
-        _options: unknown,
-        callback: (error: Error, result?: undefined) => void,
-      ) => {
+    createReadStreamMock.mockReturnValue(
+      stream as unknown as ReturnType<typeof createReadStream>,
+    );
+    cloudinaryMock.uploader.upload_stream.mockImplementation(
+      (options: { folder: string }, callback: UploadStreamCallback) => {
+        expect(options).toEqual({ folder: 'avatars' });
         callback(new Error('Cloudinary unavailable'));
         return {};
       },

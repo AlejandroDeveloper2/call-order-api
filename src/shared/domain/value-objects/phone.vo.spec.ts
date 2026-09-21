@@ -1,6 +1,6 @@
-import { InvalidPhoneException } from '../../exceptions';
+import { InvalidPhoneException } from '../exceptions';
 
-import { Phone } from '../phone.vo';
+import { Phone } from './phone.vo';
 
 describe('PhoneVo', () => {
   describe('create', () => {
@@ -46,6 +46,31 @@ describe('PhoneVo', () => {
       invalidPhones.forEach((phone) => {
         expect(() => Phone.create(phone)).toThrow(InvalidPhoneException);
       });
+    });
+  });
+  describe('equals', () => {
+    it('deberia devolver true si dos instancias de tipo Phone tienen el mismo valor', () => {
+      // Arrange
+      const phone1 = Phone.create('3105073188');
+      const phone2 = Phone.create(phone1.toString());
+
+      // Act
+      const result = phone1.equals(phone2);
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it('deberia devolver false si dos instancias de tipo Phone no tienen el mismo valor', () => {
+      // Arrange
+      const phone1 = Phone.create('3105073188');
+      const phone2 = Phone.create('3112024566');
+
+      // Act
+      const result = phone1.equals(phone2);
+
+      // Assert
+      expect(result).toBe(false);
     });
   });
 });

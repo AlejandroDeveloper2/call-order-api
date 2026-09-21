@@ -1,6 +1,6 @@
-import { InvalidFullnameException } from '../../exceptions';
+import { InvalidFullnameException } from '../exceptions';
 
-import { Fullname } from '../fullname.vo';
+import { Fullname } from './fullname.vo';
 
 describe('FullnameVo', () => {
   describe('create', () => {
