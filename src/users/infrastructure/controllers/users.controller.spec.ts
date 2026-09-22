@@ -18,7 +18,7 @@ import { FILE_UPLOADER } from '../../../shared/domain/ports';
 import { CloudinaryUploadInterceptor } from '../../../shared/infrastructure/interceptors';
 
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-user-id'),
+  v7: jest.fn(() => 'test-user-id'),
 }));
 
 describe('UsersController', () => {

@@ -25,8 +25,6 @@ export class PostgresPermissionRepository implements PermissionRepositoryPort {
   constructor(
     @InjectRepository(PostgresPermissionSchema)
     private readonly permissionRepository: Repository<PostgresPermissionSchema>,
-    @InjectRepository(PostgresRolePermissionSchema)
-    private rolePermissionRepository: Repository<PostgresRolePermissionSchema>,
   ) {}
 
   async findPermissionsByRoleId(roleId: string): Promise<Permission[]> {

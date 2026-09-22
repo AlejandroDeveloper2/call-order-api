@@ -1,73 +1,100 @@
-jest.mock('uuid', () => ({ v7: jest.fn(() => 'test-uuid') }));
+import { Repository, SelectQueryBuilder } from 'typeorm';
 
-import { Repository } from 'typeorm';
-
+/** Excepciones */
 import { PersistenceException } from '../../../../../shared/infrastructure/exceptions';
 
+/** Mappers */
 import { PermissionMapper } from '../mappers/permission.mapper';
 
+/** Repositorios */
 import { PostgresPermissionRepository } from './postgres-permission.repository';
+
+/** Esquemas */
+import { PostgresPermissionSchema } from '../schemas';
+import { Permission } from '../../../../domain/entities';
+
+jest.mock('uuid', () => ({ v7: jest.fn(() => 'test-uuid') }));
+
+type PermissionRepositoryMock = jest.Mocked<
+  Pick<Repository<PostgresPermissionRepository>, 'createQueryBuilder'>
+>;
+type QueryBuilderMock = jest.Mocked<
+  Pick<
+    SelectQueryBuilder<PostgresPermissionSchema>,
+    'innerJoin' | 'where' | 'getMany'
+  >
+>;
 
 describe('PostgresPermissionRepository', () => {
   let repository: PostgresPermissionRepository;
-  let permissionRepository: jest.Mocked<Partial<Repository<never>>>;
-  let rolePermissionRepository: jest.Mocked<Partial<Repository<never>>>;
-  let queryBuilder: Record<string, jest.Mock>;
+
+  let permissionRepositoryMock: PermissionRepositoryMock;
+  let queryBuilderMock: QueryBuilderMock;
 
   beforeEach(() => {
-    queryBuilder = {
+    queryBuilderMock = {
       innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       getMany: jest.fn(),
     };
-    permissionRepository = {
-      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+    permissionRepositoryMock = {
+      createQueryBuilder: jest.fn().mockReturnValue(queryBuilderMock),
     };
-    rolePermissionRepository = {};
+
     repository = new PostgresPermissionRepository(
-      permissionRepository as never,
-      rolePermissionRepository as never,
+      permissionRepositoryMock as unknown as Repository<PostgresPermissionSchema>,
     );
   });
 
-  it('deberia devolver los permisos mapeados por rol', async () => {
-    // Arrange
-    const domainPermission = { permissionId: 'permission-id' };
-    const toDomain = jest
-      .spyOn(PermissionMapper, 'toDomain')
-      .mockReturnValue(domainPermission as never);
-    queryBuilder.getMany.mockResolvedValue([{ id: 'permission-id' }]);
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    // Act
-    const result = await repository.findPermissionsByRoleId('role-id');
+  describe('findPermissionsByRoleId', () => {
+    it('deberia devolver los permisos mapeados por rol', async () => {
+      // Arrange
+      const domainPermission = { permissionId: 'permission-id' } as Permission;
+      const toDomain = jest
+        .spyOn(PermissionMapper, 'toDomain')
+        .mockReturnValue(domainPermission);
+      queryBuilderMock.getMany.mockResolvedValue([
+        { id: 'permission-id' },
+      ] as PostgresPermissionSchema[]);
 
-    // Assert
-    expect(result).toEqual([domainPermission]);
-    expect(queryBuilder.where).toHaveBeenCalledWith('rp.roleId = :roleId', {
-      roleId: 'role-id',
+      // Act
+      const result = await repository.findPermissionsByRoleId('role-id');
+
+      // Assert
+      expect(result).toEqual([domainPermission]);
+      expect(queryBuilderMock.where).toHaveBeenCalledWith(
+        'rp.roleId = :roleId',
+        {
+          roleId: 'role-id',
+        },
+      );
+      expect(toDomain.mock.calls).toContainEqual([{ id: 'permission-id' }]);
     });
-    expect(toDomain.mock.calls).toContainEqual([{ id: 'permission-id' }]);
-  });
 
-  it('deberia devolver una lista vacia cuando el rol no tiene permisos', async () => {
-    // Arrange
-    queryBuilder.getMany.mockResolvedValue([]);
+    it('deberia devolver una lista vacia cuando el rol no tiene permisos', async () => {
+      // Arrange
+      queryBuilderMock.getMany.mockResolvedValue([]);
 
-    // Act
-    const result = await repository.findPermissionsByRoleId('role-id');
+      // Act
+      const result = await repository.findPermissionsByRoleId('role-id');
 
-    // Assert
-    expect(result).toEqual([]);
-  });
+      // Assert
+      expect(result).toEqual([]);
+    });
 
-  it('deberia convertir errores de TypeORM a PersistenceException', async () => {
-    // Arrange
-    queryBuilder.getMany.mockRejectedValue(new Error('database error'));
+    it('deberia convertir errores de TypeORM a PersistenceException', async () => {
+      // Arrange
+      queryBuilderMock.getMany.mockRejectedValue(new Error('database error'));
 
-    // Act
-    const result = repository.findPermissionsByRoleId('role-id');
+      // Act
+      const result = repository.findPermissionsByRoleId('role-id');
 
-    // Assert
-    await expect(result).rejects.toThrow(PersistenceException);
+      // Assert
+      await expect(result).rejects.toThrow(PersistenceException);
+    });
   });
 });

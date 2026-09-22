@@ -35,7 +35,7 @@ import {
 } from '../dto';
 
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-verification-code-id'),
+  v7: jest.fn(() => 'test-verification-code-id'),
 }));
 
 describe('AuthController', () => {
