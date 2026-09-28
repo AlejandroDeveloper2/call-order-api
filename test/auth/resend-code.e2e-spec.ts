@@ -4,23 +4,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { App } from 'supertest/types';
 import { addMinutes } from 'date-fns';
 
-/** Puertos */
 import { EMAIL_SENDER_KEY } from '../../src/shared/domain/ports';
 
-/** Seeds */
 import { AuthSeeder } from '../../src/shared/infrastructure/seed/auth.seeder';
 
-/** Módulos */
+import { FakeEmailSender } from '../fakers/fake-email-sender.adapter';
+
+import { AppExceptionFilter } from '../../src/shared/infrastructure/filters/app-exception.filter';
+
 import { AppModule } from '../../src/app.module';
 import { SeederModule } from '../../src/shared/infrastructure/seed/seeder.module';
 
-/** Adapters */
-import { FakeEmailSender } from '../fakers/fake-email-sender.adapter';
-
-/** Filtros */
-import { AppExceptionFilter } from '../../src/shared/infrastructure/filters/app-exception.filter';
-
-describe('POST /auth/validate', () => {
+describe('POST /auth/resend/code', () => {
   let app: INestApplication<App>;
   let authSeeder: AuthSeeder;
 
@@ -53,8 +48,8 @@ describe('POST /auth/validate', () => {
     await app?.close();
   });
 
-  describe('cuando el usuario valida su identidad', () => {
-    it('POST /auth/login', async () => {
+  describe('cuando un código de verificación ha expirado', () => {
+    it('POST /auth/login iniciar sesión', async () => {
       // Arrange
       const credentials = {
         email: 'jhon.doe@example.com',
@@ -73,35 +68,27 @@ describe('POST /auth/validate', () => {
       expect(response.status).toBe(200);
     });
 
-    it('deberia verificar el código de verificación y generar los tokens de acceso', async () => {
+    it('deberia generar y reenviar al correo electrónico del usuario que esta intentando autenticarse', async () => {
       // Arrange
+      await authSeeder.updateCodeByEmail(
+        'jhon.doe@example.com',
+        {
+          expiresAt: addMinutes(new Date(), -11),
+        },
+        true,
+      );
       const email = fakeEmailSenderAdapter.getLastEmail();
 
       // Act
       const response = await request(app.getHttpServer())
-        .post('/api/v1/auth/validate')
+        .post('/api/v1/auth/resend/code')
         .send({
-          verificationCode: email ? email.code : '000000',
           email: 'jhon.doe@example.com',
+          expiredCode: email ? email.code : '000000',
         });
 
       // Assert
-      const validationResult = response.body as {
-        data: { token: string; refreshToken: string };
-      };
-
       expect(response.status).toBe(200);
-
-      expect(response.body).toEqual(
-        expect.objectContaining({
-          data: {
-            token: validationResult.data.token,
-            refreshToken: validationResult.data.refreshToken,
-          },
-          httpCode: 200,
-          message: 'Identidad verificada con éxito',
-        }),
-      );
     });
   });
 
@@ -112,9 +99,9 @@ describe('POST /auth/validate', () => {
 
       // Act
       const response = await request(app.getHttpServer())
-        .post('/api/v1/auth/validate')
+        .post('/api/v1/auth/resend/code')
         .send({
-          verificationCode: invalidCode,
+          expiredCode: invalidCode,
           email: 'jhon.doe@example.com',
         });
 
@@ -125,32 +112,32 @@ describe('POST /auth/validate', () => {
     });
   });
 
-  describe('cuando el código de verificación ha expirado', () => {
-    it('deberia lanzar un error de código expirado', async () => {
-      //Arrange
+  describe('cuando el código de verificación no ha expirado aun', () => {
+    it('deberia lanzar un error de código no expirado aun', async () => {
+      // Arrange
       await authSeeder.updateCodeByEmail(
         'jhon.doe@example.com',
         {
-          expiresAt: addMinutes(new Date(), -11),
-          usedAt: null as unknown as Date,
+          expiresAt: addMinutes(new Date(), 10),
         },
-        true,
         true,
       );
       const email = fakeEmailSenderAdapter.getLastEmail();
 
       // Act
       const response = await request(app.getHttpServer())
-        .post('/api/v1/auth/validate')
+        .post('/api/v1/auth/resend/code')
         .send({
-          verificationCode: email ? email.code : '000000',
+          expiredCode: email ? email.code : '000000',
           email: 'jhon.doe@example.com',
         });
 
       // Assert
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('httpCode');
-      expect((response.body as { name: string }).name).toBe('EXPIRED_CODE');
+      expect((response.body as { name: string }).name).toBe(
+        'CODE_NOT_EXPIRED_YET',
+      );
     });
   });
 });

@@ -86,7 +86,6 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
     email: string,
     codeLookup: string,
   ): Promise<VerificationCodeValidationModel | null> {
-    const now = new Date();
     try {
       const result = await this.repository
         .createQueryBuilder('code')
@@ -107,7 +106,6 @@ export class PostgresVerificationCodeRepository implements VerificationCodeRepos
           codeLookup,
         })
         .andWhere('code.usedAt IS NULL')
-        .andWhere('code.expiresAt < :now', { now })
         .orderBy('code.createdAt', 'DESC')
         .getOne();
 

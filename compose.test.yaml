@@ -17,8 +17,11 @@ services:
     build:
       context: .
       target: test # Incluye código, dependencias y NestJS
+    env_file:
+      - .env.test
     environment:
       NODE_ENV: test
+      E2E_IN_CONTAINER: 'true'
       DB_HOST: db
       DB_PORT: 5432
       DB_USERNAME: postgres

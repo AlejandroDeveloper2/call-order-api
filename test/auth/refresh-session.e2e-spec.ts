@@ -3,13 +3,13 @@ import { VersioningType, type INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { App } from 'supertest/types';
 import cookieParser from 'cookie-parser';
+import { addDays } from 'date-fns';
 
 /** Puertos */
 import { EMAIL_SENDER_KEY } from '../../src/shared/domain/ports';
 
 /** Seeds */
-import { AccountSeeder } from '../../src/shared/infrastructure/seed/account.seeder';
-import { SessionsSeeder } from '../../src/shared/infrastructure/seed/sessions.seeder';
+import { AuthSeeder } from '../../src/shared/infrastructure/seed/auth.seeder';
 
 /** Módulos */
 import { AppModule } from '../../src/app.module';
@@ -23,8 +23,7 @@ import { FakeEmailSender } from '../fakers/fake-email-sender.adapter';
 
 describe('POST /auth/refresh', () => {
   let app: INestApplication<App>;
-  let accountSeeder: AccountSeeder;
-  let sessionsSeeder: SessionsSeeder;
+  let authSeeder: AuthSeeder;
   let tokens: { token: string; refreshToken: string };
 
   const fakeEmailSenderAdapter = new FakeEmailSender();
@@ -37,10 +36,13 @@ describe('POST /auth/refresh', () => {
       .useValue(fakeEmailSenderAdapter)
       .compile();
 
-    accountSeeder = moduleFixture.get(AccountSeeder);
-    sessionsSeeder = moduleFixture.get(SessionsSeeder);
+    authSeeder = moduleFixture.get(AuthSeeder);
 
-    await accountSeeder.seed();
+    await authSeeder.seed();
+    await authSeeder.updateSessionByEmail('jhon.doe@example.com', {
+      expiresAt: addDays(new Date(), -2),
+    });
+
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({
@@ -54,7 +56,7 @@ describe('POST /auth/refresh', () => {
 
   afterAll(async () => {
     fakeEmailSenderAdapter.clear();
-    await accountSeeder?.drop();
+    await authSeeder?.drop();
     await app?.close();
   });
 
@@ -101,9 +103,6 @@ describe('POST /auth/refresh', () => {
     });
 
     it('deberia refrescar la sesión del usuario autenticado', async () => {
-      // Arrange
-      await sessionsSeeder.updateToExpiredSession('jhon.doe@example.com');
-
       // Act
       const response = await request(app.getHttpServer())
         .post('/api/v1/auth/refresh')
@@ -132,9 +131,6 @@ describe('POST /auth/refresh', () => {
 
   describe('cuando la cookie con el refresh token no es proporcionada', () => {
     it('deberia lanzar un error de refresh token no proporcionado', async () => {
-      // Arrange
-      await sessionsSeeder.updateToExpiredSession('jhon.doe@example.com');
-
       // Act
       const response = await request(app.getHttpServer())
         .post('/api/v1/auth/refresh')
@@ -152,9 +148,6 @@ describe('POST /auth/refresh', () => {
 
   describe('cuando el token no es proporcionado', () => {
     it('deberia lanzar un error de token de acceso no proporcionado o esta malformado', async () => {
-      // Arrange
-      await sessionsSeeder.updateToExpiredSession('jhon.doe@example.com');
-
       // Act
       const response = await request(app.getHttpServer())
         .post('/api/v1/auth/refresh')
@@ -170,9 +163,6 @@ describe('POST /auth/refresh', () => {
 
   describe('cuando el token no tiene un formato valido', () => {
     it('deberia lanzar un error de token de acceso malformado o invalido', async () => {
-      // Arrange
-      await sessionsSeeder.updateToExpiredSession('jhon.doe@example.com');
-
       // Act
       const response = await request(app.getHttpServer())
         .post('/api/v1/auth/refresh')

@@ -169,10 +169,6 @@ describe('PostgresVerificationCodeRepository', () => {
       );
 
       // Assert
-      const [, parameters] = createQueryBuilderMock.andWhere.mock.calls.find(
-        ([condition]) => condition === 'code.expiresAt < :now',
-      ) as [string, { now: unknown }];
-
       expect(result).toEqual({
         verificationCodeId: 'code-id',
         codeHash: 'hash',
@@ -194,8 +190,6 @@ describe('PostgresVerificationCodeRepository', () => {
         },
       );
 
-      expect(parameters.now).toBeInstanceOf(Date);
-
       expect(createQueryBuilderMock.orderBy).toHaveBeenCalledWith(
         'code.createdAt',
         'DESC',
@@ -213,12 +207,7 @@ describe('PostgresVerificationCodeRepository', () => {
       );
 
       // Assert
-      const [, parameters] = createQueryBuilderMock.andWhere.mock.calls.find(
-        ([condition]) => condition === 'code.expiresAt < :now',
-      ) as [string, { now: unknown }];
-
       expect(result).toBeNull();
-      expect(parameters.now).toBeInstanceOf(Date);
     });
 
     it('deberia lanzar PersistenceException si ocurre un error durante la consulta', async () => {

@@ -7,8 +7,7 @@ import { App } from 'supertest/types';
 import { EMAIL_SENDER_KEY } from '../../src/shared/domain/ports';
 
 /** Seeds */
-import { AccountSeeder } from '../../src/shared/infrastructure/seed/account.seeder';
-import { RolesSeeder } from '../../src/shared/infrastructure/seed/roles.seeder';
+import { AuthSeeder } from '../../src/shared/infrastructure/seed/auth.seeder';
 
 /** Módulos */
 import { AppModule } from '../../src/app.module';
@@ -22,8 +21,7 @@ import { AppExceptionFilter } from '../../src/shared/infrastructure/filters/app-
 
 describe('POST /auth/register', () => {
   let app: INestApplication<App>;
-  let accountSeeder: AccountSeeder;
-  let rolesSeeder: RolesSeeder;
+  let authSeeder: AuthSeeder;
   let accessToken: string;
 
   const fakeEmailSenderAdapter = new FakeEmailSender();
@@ -36,9 +34,14 @@ describe('POST /auth/register', () => {
       .useValue(fakeEmailSenderAdapter)
       .compile();
 
-    accountSeeder = moduleFixture.get(AccountSeeder);
-    rolesSeeder = moduleFixture.get(RolesSeeder);
-    await accountSeeder.seed();
+    authSeeder = moduleFixture.get(AuthSeeder);
+    await authSeeder.seed([
+      {
+        code: 'auth:create:account',
+        description: 'Crear cuentas de usuario',
+        role: 'Administrador',
+      },
+    ]);
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.enableVersioning({
@@ -51,7 +54,7 @@ describe('POST /auth/register', () => {
 
   afterAll(async () => {
     fakeEmailSenderAdapter.clear();
-    await accountSeeder?.drop();
+    await authSeeder?.drop();
     await app?.close();
   });
 
@@ -99,7 +102,7 @@ describe('POST /auth/register', () => {
 
     it('deberia crear una cuenta de usuario con los datos y credenciales proporcionados', async () => {
       // Arrange
-      const role = (await rolesSeeder.getAllRoles()).at(0);
+      const role = (await authSeeder.getAllRoles()).at(0);
 
       const accountData = {
         fullname: 'Joe Smith',
@@ -128,7 +131,7 @@ describe('POST /auth/register', () => {
 
     it('deberia lanzar un error de cuenta existente si el correo de la cuenta a crear ya esta asociado a otra cuenta ya existente', async () => {
       // Arrange
-      const role = (await rolesSeeder.getAllRoles()).at(0);
+      const role = (await authSeeder.getAllRoles()).at(0);
 
       const accountData = {
         fullname: 'Joe Smith',
@@ -198,7 +201,7 @@ describe('POST /auth/register', () => {
 
     it('deberia lanzar un error de permisisos insuficientes', async () => {
       // Arrange
-      const role = (await rolesSeeder.getAllRoles()).at(1);
+      const role = (await authSeeder.getAllRoles()).at(1);
 
       const accountData = {
         fullname: 'Jerry Clinton',

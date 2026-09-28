@@ -11,14 +11,14 @@ import { AppModule } from '../../src/app.module';
 import { SeederModule } from '../../src/shared/infrastructure/seed/seeder.module';
 
 /** Seeders */
-import { AccountSeeder } from '../../src/shared/infrastructure/seed/account.seeder';
+import { AuthSeeder } from '../../src/shared/infrastructure/seed/auth.seeder';
 
 /** Filtros */
 import { AppExceptionFilter } from '../../src/shared/infrastructure/filters/app-exception.filter';
 
 describe('POST /auth/login', () => {
   let app: INestApplication<App>;
-  let accountSeeder: AccountSeeder;
+  let authSeeder: AuthSeeder;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -30,8 +30,8 @@ describe('POST /auth/login', () => {
       })
       .compile();
 
-    accountSeeder = moduleFixture.get(AccountSeeder);
-    await accountSeeder.seed();
+    authSeeder = moduleFixture.get(AuthSeeder);
+    await authSeeder.seed();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
@@ -44,7 +44,7 @@ describe('POST /auth/login', () => {
   });
 
   afterAll(async () => {
-    await accountSeeder?.drop();
+    await authSeeder?.drop();
     await app?.close();
   });
 
