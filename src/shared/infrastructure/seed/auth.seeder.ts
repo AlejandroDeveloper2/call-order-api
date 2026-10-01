@@ -20,10 +20,10 @@ import {
 type PermissionTest = {
   code: string;
   description: string;
-  roleId: string;
+  roleIds: string[];
 };
-type PermissionWithRoleName = Omit<PermissionTest, 'roleId'> & {
-  role: string;
+type PermissionWithRoleName = Omit<PermissionTest, 'roleIds'> & {
+  roles: string[];
 };
 
 @Injectable()
@@ -55,7 +55,7 @@ export class AuthSeeder {
   private async saveAccountPermission(
     permission: PermissionTest,
   ): Promise<void> {
-    const { code, description, roleId } = permission;
+    const { code, description, roleIds } = permission;
 
     // verificar si existe el permiso
     let createAccountPermission = await this.permissionRepository.findOneBy({
@@ -71,25 +71,36 @@ export class AuthSeeder {
       });
     }
 
-    // Finalmente se crea y asigna el permiso a un rol de usuario especifico
-    await this.rolePermissionRepository.save({
-      id: uuidv7(),
-      roleId,
-      permissionId: createAccountPermission.id,
-    });
+    // Finalmente se crea y asigna el permiso a un rol o roles de usuario
+    await Promise.all(
+      roleIds.map(
+        async (roleId) =>
+          await this.rolePermissionRepository.save({
+            id: uuidv7(),
+            roleId,
+            permissionId: createAccountPermission.id,
+          }),
+      ),
+    );
   }
 
   async seed(permissions?: PermissionWithRoleName[]): Promise<void> {
     await this.drop();
 
     // Encriptamos las contraseñas de prueba
-    const [passwordHash1, passwordHash2, passwordHash3, passwordHash4] =
-      await this.hashPasswords([
-        'Password1234@!',
-        'Password7890@!',
-        'Password1289@!',
-        'Password1212@!',
-      ]);
+    const [
+      passwordHash1,
+      passwordHash2,
+      passwordHash3,
+      passwordHash4,
+      passwordHash5,
+    ] = await this.hashPasswords([
+      'Password1234@!',
+      'Password7890@!',
+      'Password1289@!',
+      'Password1212@!',
+      'Password2255@!',
+    ]);
 
     // Creación de roles de prueba
     const result = await this.roleRepository
@@ -108,13 +119,14 @@ export class AuthSeeder {
     // Creación de permisos si es requerido
     if (permissions) {
       const permissionsWithRole: PermissionTest[] = permissions.map(
-        (permission) => {
-          if (permission.role === 'Administrador')
-            return { ...permission, roleId: roles[0].id };
-          if (permission.role === 'Agente')
-            return { ...permission, roleId: roles[1].id };
-          return { ...permission, roleId: roles[2].id };
-        },
+        (permission) => ({
+          ...permission,
+          roleIds: permission.roles.map((roleName) => {
+            if (roleName === 'Administrador') return roles[0].id;
+            if (roleName === 'Agente') return roles[1].id;
+            return roles[2].id;
+          }),
+        }),
       );
 
       await Promise.all(
@@ -156,6 +168,13 @@ export class AuthSeeder {
           roleId: roles[1].id,
           isActive: true,
         },
+        {
+          id: uuidv7(),
+          fullname: 'Pedro Doe',
+          phone: '+573104168811',
+          roleId: roles[2].id,
+          isActive: true,
+        },
       ])
       .execute();
 
@@ -194,6 +213,13 @@ export class AuthSeeder {
           email: 'sara.doe@example.com',
           passwordHash: passwordHash4,
           profileId: users[3].id,
+          failedAttempts: 0,
+        },
+        {
+          id: uuidv7(),
+          email: 'pedro.doe@example.com',
+          passwordHash: passwordHash5,
+          profileId: users[4].id,
           failedAttempts: 0,
         },
       ])
@@ -250,6 +276,14 @@ export class AuthSeeder {
       },
       dataToUpdate,
     );
+  }
+
+  async clearSessionsByEmail(email: string): Promise<void> {
+    const account = await this.accountRepository.findOneBy({ email });
+
+    if (!account) return;
+
+    await this.sessionRepository.delete({ accountId: account.id });
   }
 
   async drop(): Promise<void> {

@@ -1,16 +1,7 @@
-import { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TokenExpiredError } from 'jsonwebtoken';
 
 /** Casos de uso */
 import { ValidateAccessTokenUseCase } from '../../application/use-cases';
-
-/** Excepciones */
-import {
-  ExpiredTokenException,
-  MalformedTokenException,
-  MissingTokenException,
-} from '../exceptions';
 
 /** Estrategias */
 import { JwtStrategy } from './jwt.strategy';
@@ -39,61 +30,6 @@ describe('JwtStrategy', () => {
 
   afterEach(() => {
     jest.resetAllMocks();
-  });
-
-  const createContext = (authorization?: string) =>
-    ({
-      switchToHttp: () => ({
-        getRequest: () => ({ headers: { authorization } }),
-      }),
-    }) as ExecutionContext;
-
-  it('deberia lanzar MissingTokenException cuando no existe Authorization', () => {
-    // Arrange
-    const context = createContext();
-
-    // Act
-    const result = () => strategy.handleRequest(null, {}, null, context);
-
-    // Assert
-    expect(result).toThrow(MissingTokenException);
-  });
-
-  it('deberia lanzar ExpiredTokenException cuando el token expiro', () => {
-    // Arrange
-    const context = createContext('Bearer expired-token');
-    const expirationError = new TokenExpiredError('jwt expired', new Date());
-
-    // Act
-    const result = () =>
-      strategy.handleRequest(null, {}, expirationError, context);
-
-    // Assert
-    expect(result).toThrow(ExpiredTokenException);
-  });
-
-  it('deberia lanzar MalformedTokenException cuando Passport informa un error', () => {
-    // Arrange
-    const context = createContext('Bearer malformed-token');
-
-    // Act
-    const result = () =>
-      strategy.handleRequest(new Error('invalid token'), false, null, context);
-
-    // Assert
-    expect(result).toThrow(MalformedTokenException);
-  });
-
-  it('deberia devolver el usuario cuando el token es valido', () => {
-    // Arrange
-    const context = createContext('Bearer valid-token');
-    const user = { accountId: 'account-id' };
-
-    // Act
-    const result = strategy.handleRequest(null, user, null, context);
-
-    // Assert
-    expect(result).toBe(user);
   });
 
   it('deberia delegar la validacion del payload al caso de uso', async () => {
