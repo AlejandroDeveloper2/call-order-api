@@ -39,7 +39,7 @@ describe('POST /auth/register', () => {
       {
         code: 'auth:create:account',
         description: 'Crear cuentas de usuario',
-        role: 'Administrador',
+        roles: ['Administrador'],
       },
     ]);
     app = moduleFixture.createNestApplication();
