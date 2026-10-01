@@ -17,7 +17,7 @@ import { SeederModule } from '../../src/shared/infrastructure/seed/seeder.module
 /** Filtros */
 import { AppExceptionFilter } from '../../src/shared/infrastructure/filters/app-exception.filter';
 
-describe('POST /auth/update/email', () => {
+describe('PATCH /auth/update/email', () => {
   let app: INestApplication<App>;
   let authSeeder: AuthSeeder;
   let accessToken: string;
